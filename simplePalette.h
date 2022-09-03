@@ -1,0 +1,1 @@
+short int COLORPALETTE_SIMPLE[256];

@@ -41,8 +41,6 @@ $(TARGET).elf : $(OBJS)
 	$(LD) $^ $(LDFLAGS) -o $@
 
 # Compile (step 1)
-#$(OBJS) : $(SRCS)
-#	$(CC) -c $^ $(CFLAGS) -o $@
 $(BUILDDIR)/%.o : $(SRCDIR)/%.c
 	$(CC) -c $< $(CFLAGS) -o $@
 
