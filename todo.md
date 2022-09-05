@@ -3,7 +3,7 @@
 	[x] DevkitPro
 	[x] Makefile
 	[x] Git
-	[ ] script to quickly setup dev environment
+	[x] script to quickly setup dev environment
 
 [ ] Draw a sprite to the screen
 	[x] create bat sprite
