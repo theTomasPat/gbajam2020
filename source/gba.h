@@ -1,18 +1,23 @@
+#include <stdint.h>
+
+
 #ifndef _GBA_DEFINES_
 #define _GBA_DEFINES_
 
 
-#define RGB(r,g,b) (short)((r << 0) + (g << 5) + (b << 10))
+#define RGB(r,g,b) (uint16_t)((r << 0) + (g << 5) + (b << 10))
 
-#define VRAM_MEM ((short *)0x06000000)
-#define OAM_MEM  ((short *)0x07000000)
+#define VCOUNT_MEM   ((volatile uint16_t *)0x04000006)
+#define DISPSTAT_MEM ((volatile uint16_t *)0x04000004)
+#define VRAM_MEM ((uint16_t *)0x06000000)
+#define OAM_MEM  ((uint16_t *)0x07000000)
 
-#define BGPAL_MEM  ((short *)0x05000000)
-#define OBJPAL_MEM ((short *)0x05000200)
+#define BGPAL_MEM  ((uint16_t *)0x05000000)
+#define OBJPAL_MEM ((uint16_t *)0x05000200)
 
 
 // Display Control
-#define REG_DISPCNT ((short *)0x04000000)
+#define REG_DISPCNT ((uint16_t *)0x04000000)
 
 // Display Control, shift amounts
 #define DISPCNT_BGMODE 0
@@ -33,10 +38,10 @@
 
 
 // BG Control
-#define BG0CNT ((short *)0x04000008)
-#define BG1CNT ((short *)0x0400000A)
-#define BG2CNT ((short *)0x0400000C)
-#define BG3CNT ((short *)0x0400000E)
+#define BG0CNT ((uint16_t *)0x04000008)
+#define BG1CNT ((uint16_t *)0x0400000A)
+#define BG2CNT ((uint16_t *)0x0400000C)
+#define BG3CNT ((uint16_t *)0x0400000E)
 
 // BG Control, shift amounts
 #define BGXCNT_PRIORITY 0
@@ -49,7 +54,6 @@
 
 
 // OAM OBJ Control, shift amounts
-#define ATTR0_YCOORD 0
 #define ATTR0_ROTSCALEFLAG 8
 #define ATTR0_DBLSIZE 9
 #define ATTR0_DISABLE 9
@@ -58,11 +62,18 @@
 #define ATTR0_COLORMODE 13
 #define ATTR0_OBJSHAPE 13
 
-#define ATTR1_XCOORD 0
+#define ATTR0_YCOORD_SHIFT 0
+#define ATTR0_YCOORD_MASK 0xFF
+#define ATTR0_YCOORD(n) ((n) << ATTR0_YCOORD_SHIFT)
+
 #define ATTR1_ROTSCALEPARAM 9
 #define ATTR1_FLIPHOR 12
 #define ATTR1_FLIPVERT 13
 #define ATTR1_OBJSIZE 14
+
+#define ATTR1_XCOORD_SHIFT 0
+#define ATTR1_XCOORD_MASK 0xFF
+#define ATTR1_XCOORD(n) ((n) << ATTR1_XCOORD_SHIFT)
 
 #define ATTR2_CHARNAME 0
 #define ATTR2_PRIORITY 10
@@ -70,7 +81,7 @@
 
 
 // Keypad
-volatile short *KEYINPUT = (short *)0x04000130;
+volatile uint16_t *KEYINPUT = (uint16_t *)0x04000130;
 
 // Keypad, shift amounts
 #define KEYPAD_A 0
