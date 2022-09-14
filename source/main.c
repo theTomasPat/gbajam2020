@@ -28,20 +28,35 @@ typedef TILE8 CHARBLOCK8[256];
 #define BIT_SET(addr, val, shift) ( *(addr) |= (val << shift) )
 #define BIT_CLEAR(addr, shift) ( *addr &= ~(1 << shift) )
 #define BIT_CHECK(addr, mask, shift) ( (*(addr) &= (mask)) >> (shift) )
+
+// TODO: simplify the call for BF_SET, ideally the caller shouldn't have to
+// know how many bits are in the field and how much to shift them by
 #define BF_SET(addr, val, len, shift) (*(addr) = (*(addr)&~(((1 << len)-1) << (shift))) | ((val) << (shift)))
 
 
-typedef struct
-{
+typedef struct {
 	uint32_t oamIdx;
 	uint32_t x:9;
 	uint32_t y:8;
+	uint16_t w;
+	uint16_t h;
 	uint32_t velX;
 	uint32_t velY;
 } __attribute__((aligned (4))) Player;
 
-void OAM_Init()
-{
+typedef struct {
+	uint16_t x;
+	uint16_t y;
+	uint16_t w;
+	uint16_t h;
+} ScreenDim;
+
+// TODO: cache the input states so we can detect the different button actions
+typedef struct {
+	uint16_t keys;
+} InputState;
+
+void OAM_Init() {
 	OBJ_ATTR *obj = (OBJ_ATTR *)OAM_MEM;
 
 	for(int i = 0; i < 128; i++)
@@ -53,42 +68,47 @@ void OAM_Init()
 	}
 }
 
+uint16_t CollideBorder(Player *player, ScreenDim *screenDim)
+{
+	uint16_t outOfBounds = 0;
+
+	if( player->x < screenDim->x ) {
+		player->x = 0;
+		outOfBounds = 1;
+	}
+	if( player->x + player->w > screenDim->w ) {
+		player->x = screenDim->y - player->x;
+		outOfBounds = 1;
+	}
+	if( player->y < screenDim->y ) {
+		player->y = 0;
+		outOfBounds = 1;
+	}
+	if( player->y + player->h > screenDim->h ) {
+		player->y = screenDim->h - player->h;
+		outOfBounds = 1;
+	}
+
+	if( outOfBounds > 0 )
+		return 1;
+	return 0;
+}
+
 void UpdateOBJPos(OBJ_ATTR *obj, int x, int y)
 {
 	BF_SET(&obj->attr1, x, 9, ATTR1_XCOORD_SHIFT);
 	BF_SET(&obj->attr0, y, 8, ATTR0_YCOORD_SHIFT);
 }
 
-void vid_vsync()
+void Vsync()
 {
-	while(*VCOUNT_MEM >= 160); // wait until VDraw
+	while(*VCOUNT_MEM >= 160);  // wait until VDraw
 	while(*VCOUNT_MEM <  160);  // wait until VBlank
 }
 
 
 int main(void)
 {
-	OBJ_ATTR *OAM_objs[128];
-	OAM_objs[0] = (OBJ_ATTR *)OAM_MEM;
-
-	int batIndex = 0;
-
-	OAM_Init();
-
-	// copy the palette data to 0x05000200
-	memcpy(OBJPAL_MEM, Pal256, PalLen256);
-
-	// copy the sprite data to 0x06010000
-	memcpy(&tile8_mem[4][0], BatTiles, BatTilesLen);
-
-	// setup the bat's sprite
-	BIT_SET(&OAM_objs[batIndex]->attr0, 1, ATTR0_COLORMODE);
-	BIT_CLEAR(&OAM_objs[batIndex]->attr0, ATTR0_DISABLE);
-	BIT_CLEAR(&OAM_objs[batIndex]->attr1, ATTR1_FLIPHOR);
-	BIT_CLEAR(&OAM_objs[batIndex]->attr1, ATTR1_FLIPVERT);
-	BIT_SET(&OAM_objs[batIndex]->attr1, 1, ATTR1_OBJSIZE);
-	
-
 	// Initialize display control register
 	*REG_DISPCNT &= ~(1 << 0b111);
 	BIT_SET(REG_DISPCNT, 1, DISPCNT_OBJMAPPING); // 1D
@@ -96,11 +116,31 @@ int main(void)
 
 	BIT_SET(BG0CNT, 1, BGXCNT_COLORMODE);
 
-	Player player = (Player){ 0, 120, 80, 0, 0 };
 
+	OBJ_ATTR *OAM_objs[128];
+	OAM_objs[0] = (OBJ_ATTR *)OAM_MEM;
+	OAM_Init();
+
+	// copy the palette data to 0x05000200
+	memcpy(OBJPAL_MEM, Pal256, PalLen256);
+
+	ScreenDim screenDim = (ScreenDim){ 0, 0, 240, 160 };
+	Player player = (Player){ 0, 120, 80, 16, 16, 0, 0 };
+
+	// copy the sprite data to 0x06010000
+	memcpy(&tile8_mem[4][0], BatTiles, BatTilesLen);
+
+	// setup the bat's sprite
+	BIT_SET(&OAM_objs[player.oamIdx]->attr0, 1, ATTR0_COLORMODE);
+	BIT_CLEAR(&OAM_objs[player.oamIdx]->attr0, ATTR0_DISABLE);
+	BIT_CLEAR(&OAM_objs[player.oamIdx]->attr1, ATTR1_FLIPHOR);
+	BIT_CLEAR(&OAM_objs[player.oamIdx]->attr1, ATTR1_FLIPVERT);
+	BIT_SET(&OAM_objs[player.oamIdx]->attr1, 1, ATTR1_OBJSIZE);
+
+	// Main loop
     while(1)
 	{
-		vid_vsync();
+		Vsync();
 
 		if( ((*KEYINPUT) & 0b10000) >> KEYPAD_R == 0 )
 		{
@@ -112,8 +152,8 @@ int main(void)
 		}
 
 		// Get the sprite to move
-		player.x += 1;
-		player.y += 2;
+		player.y += 1;
+		CollideBorder(&player, &screenDim);
 		UpdateOBJPos(OAM_objs[player.oamIdx], player.x, player.y); 
 	}
 
