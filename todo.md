@@ -12,8 +12,10 @@
 	[x] assign sprite data to OAM tile
 
 [x] Move sprite around the screen
-[ ] Check for collision with screen boundary
-
+[x] Check for collision with screen boundary
+[x] Define routines for button just-pressed, down, and up
+[ ] Apply downward velocity to the player
+[ ] Apply upward force to the player when button pressed
 
 
 [ ] Setup colors
@@ -21,3 +23,21 @@
 	[ ] (optional) brighten colors in the low-end. "0-14 are practically all black"
 	[ ] export to C file (GIMP exports to C natively)
 
+
+
+
+## NOTES
+
+Flappy bird clone ideas
+
+- witch flying through obstacles
+	- holes in trees
+	- mushrooms
+- drone (or paper plane) flying through targets
+
+Infinite runner instead of Flappy Bird
+
+- similar to Chrome's dino game
+- witch flying on vroom
+	- hopping over obstacles
+	- ducking under bats

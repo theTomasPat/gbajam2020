@@ -84,16 +84,16 @@
 volatile uint16_t *KEYINPUT = (uint16_t *)0x04000130;
 
 // Keypad, shift amounts
-#define KEYPAD_A 0
-#define KEYPAD_B 1
-#define KEYPAD_SEL 2
-#define KEYPAD_START 3
-#define KEYPAD_R 4
-#define KEYPAD_L 5
-#define KEYPAD_U 6
-#define KEYPAD_D 7
-#define KEYPAD_RS 8
-#define KEYPAD_LS 9
+#define KEYPAD_A (1 << 0)
+#define KEYPAD_B (1 << 1)
+#define KEYPAD_SEL (1 << 2)
+#define KEYPAD_START (1 << 3)
+#define KEYPAD_R (1 << 4)
+#define KEYPAD_L (1 << 5)
+#define KEYPAD_U (1 << 6)
+#define KEYPAD_D (1 << 7)
+#define KEYPAD_RS (1 << 8)
+#define KEYPAD_LS (1 << 9)
 
 
 #endif

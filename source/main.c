@@ -6,8 +6,7 @@
 
 #define LENGTH(arr) (sizeof(arr) / sizeof(arr[0]))
 
-typedef struct
-{
+typedef struct {
 	uint16_t attr0;
 	uint16_t attr1;
 	uint16_t attr2;
@@ -53,8 +52,35 @@ typedef struct {
 
 // TODO: cache the input states so we can detect the different button actions
 typedef struct {
-	uint16_t keys;
+	uint16_t prev;
+	uint16_t curr;
 } InputState;
+
+// The buttons are 0 if pressed, 1 if not pressed
+uint16_t ButtonPressed(InputState *inputs, uint16_t button) {
+	// mask out the button from the prev and curr button states
+	uint16_t prevPressed = (inputs->prev & button);
+	uint16_t currPressed = (inputs->curr & button);
+
+	// since the logic for button presses is inverted, we need to check the
+	// "falling edge" to signal a button press. That means the masked input
+	// needs to be a lower value than the masked previous input in order to
+	// be considered "just pressed"
+	if( currPressed < prevPressed ) return 1;
+	return 0;
+}
+uint16_t ButtonUp(InputState *inputs, uint16_t button) {
+	return (inputs->curr & button) > 0 ? 1 : 0;
+}
+uint16_t ButtonDown(InputState *inputs, uint16_t button) {
+	return (inputs->curr & button) < 1 ? 1 : 0;
+}
+
+// Update the buffered input states
+void UpdateButtonStates(InputState *inputs) {
+	inputs->prev = inputs->curr;
+	inputs->curr = *KEYINPUT;
+}
 
 void OAM_Init() {
 	OBJ_ATTR *obj = (OBJ_ATTR *)OAM_MEM;
@@ -68,8 +94,7 @@ void OAM_Init() {
 	}
 }
 
-uint16_t CollideBorder(Player *player, ScreenDim *screenDim)
-{
+uint16_t CollideBorder(Player *player, ScreenDim *screenDim) {
 	uint16_t outOfBounds = 0;
 
 	if( player->x < screenDim->x ) {
@@ -94,21 +119,18 @@ uint16_t CollideBorder(Player *player, ScreenDim *screenDim)
 	return 0;
 }
 
-void UpdateOBJPos(OBJ_ATTR *obj, int x, int y)
-{
+void UpdateOBJPos(OBJ_ATTR *obj, int x, int y) {
 	BF_SET(&obj->attr1, x, 9, ATTR1_XCOORD_SHIFT);
 	BF_SET(&obj->attr0, y, 8, ATTR0_YCOORD_SHIFT);
 }
 
-void Vsync()
-{
+void Vsync() {
 	while(*VCOUNT_MEM >= 160);  // wait until VDraw
 	while(*VCOUNT_MEM <  160);  // wait until VBlank
 }
 
 
-int main(void)
-{
+int main(void) {
 	// Initialize display control register
 	*REG_DISPCNT &= ~(1 << 0b111);
 	BIT_SET(REG_DISPCNT, 1, DISPCNT_OBJMAPPING); // 1D
@@ -116,6 +138,7 @@ int main(void)
 
 	BIT_SET(BG0CNT, 1, BGXCNT_COLORMODE);
 
+	InputState inputs = (InputState){0};
 
 	OBJ_ATTR *OAM_objs[128];
 	OAM_objs[0] = (OBJ_ATTR *)OAM_MEM;
@@ -141,8 +164,9 @@ int main(void)
     while(1)
 	{
 		Vsync();
+		UpdateButtonStates(&inputs);
 
-		if( ((*KEYINPUT) & 0b10000) >> KEYPAD_R == 0 )
+		if( ButtonDown(&inputs, KEYPAD_A) )
 		{
 			BGPAL_MEM[0] = RGB(31, 31, 0);
 		}
