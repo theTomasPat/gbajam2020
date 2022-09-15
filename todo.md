@@ -14,8 +14,9 @@
 [x] Move sprite around the screen
 [x] Check for collision with screen boundary
 [x] Define routines for button just-pressed, down, and up
-[ ] Apply downward velocity to the player
-[ ] Apply upward force to the player when button pressed
+[x] Apply downward velocity to the player
+[x] Apply upward force to the player when button pressed
+[x] Keep player within screen bounds
 
 
 [ ] Setup colors

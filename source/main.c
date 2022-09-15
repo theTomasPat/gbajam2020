@@ -99,18 +99,22 @@ uint16_t CollideBorder(Player *player, ScreenDim *screenDim) {
 
 	if( player->x < screenDim->x ) {
 		player->x = 0;
+		player->velX = 0;
 		outOfBounds = 1;
 	}
 	if( player->x + player->w > screenDim->w ) {
 		player->x = screenDim->y - player->x;
+		player->velX = 0;
 		outOfBounds = 1;
 	}
 	if( player->y < screenDim->y ) {
 		player->y = 0;
+		player->velY = 0;
 		outOfBounds = 1;
 	}
 	if( player->y + player->h > screenDim->h ) {
 		player->y = screenDim->h - player->h;
+		player->velY = 0;
 		outOfBounds = 1;
 	}
 
@@ -166,17 +170,19 @@ int main(void) {
 		Vsync();
 		UpdateButtonStates(&inputs);
 
-		if( ButtonDown(&inputs, KEYPAD_A) )
+		if( ButtonPressed(&inputs, KEYPAD_A) )
 		{
-			BGPAL_MEM[0] = RGB(31, 31, 0);
-		}
-		else
-		{
-			BGPAL_MEM[0] = RGB(0, 0, 0);
+			player.velY = -8;
 		}
 
 		// Get the sprite to move
-		player.y += 1;
+		player.velY += 1; // TODO:figure out how to make the player fall slower
+		if( (int16_t)player.y + (int16_t)player.velY > 0 ) {
+			player.y += player.velY;
+		}
+		else {
+			player.y = 0;
+		}
 		CollideBorder(&player, &screenDim);
 		UpdateOBJPos(OAM_objs[player.oamIdx], player.x, player.y); 
 	}
