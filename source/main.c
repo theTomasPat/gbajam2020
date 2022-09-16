@@ -1,21 +1,22 @@
 #include <stdint.h>
 #include <string.h>
 #include "gba.h"
+#include "fixed.h"
 #include "256Palette.h"
 #include "Bat.h"
 
 #define LENGTH(arr) (sizeof(arr) / sizeof(arr[0]))
 
 typedef struct {
-	uint16_t attr0;
-	uint16_t attr1;
-	uint16_t attr2;
-	uint16_t fill;
+	u16 attr0;
+	u16 attr1;
+	u16 attr2;
+	u16 fill;
 } OBJ_ATTR;
 
 // data containers for each type of tile
-typedef struct { uint32_t data[8];  } TILE4;
-typedef struct { uint32_t data[16]; } TILE8;
+typedef struct { u32 data[8];  } TILE4;
+typedef struct { u32 data[16]; } TILE8;
 
 // each "bank" of tiles occupies 16KB, for 32byte tiles, that's 512 per bank
 typedef TILE4 CHARBLOCK[512];
@@ -34,33 +35,32 @@ typedef TILE8 CHARBLOCK8[256];
 
 
 typedef struct {
-	uint32_t oamIdx;
-	uint32_t x:9;
-	uint32_t y:8;
-	uint16_t w;
-	uint16_t h;
-	uint32_t velX;
-	uint32_t velY;
+	u32 oamIdx;
+	u32 x:9;
+	u32 y:8;
+	u16 w;
+	u16 h;
+	fp_t velX;
+	fp_t velY;
 } __attribute__((aligned (4))) Player;
 
 typedef struct {
-	uint16_t x;
-	uint16_t y;
-	uint16_t w;
-	uint16_t h;
+	u16 x;
+	u16 y;
+	u16 w;
+	u16 h;
 } ScreenDim;
 
-// TODO: cache the input states so we can detect the different button actions
 typedef struct {
-	uint16_t prev;
-	uint16_t curr;
+	u16 prev;
+	u16 curr;
 } InputState;
 
 // The buttons are 0 if pressed, 1 if not pressed
-uint16_t ButtonPressed(InputState *inputs, uint16_t button) {
+u16 ButtonPressed(InputState *inputs, u16 button) {
 	// mask out the button from the prev and curr button states
-	uint16_t prevPressed = (inputs->prev & button);
-	uint16_t currPressed = (inputs->curr & button);
+	u16 prevPressed = (inputs->prev & button);
+	u16 currPressed = (inputs->curr & button);
 
 	// since the logic for button presses is inverted, we need to check the
 	// "falling edge" to signal a button press. That means the masked input
@@ -69,10 +69,10 @@ uint16_t ButtonPressed(InputState *inputs, uint16_t button) {
 	if( currPressed < prevPressed ) return 1;
 	return 0;
 }
-uint16_t ButtonUp(InputState *inputs, uint16_t button) {
+u16 ButtonUp(InputState *inputs, u16 button) {
 	return (inputs->curr & button) > 0 ? 1 : 0;
 }
-uint16_t ButtonDown(InputState *inputs, uint16_t button) {
+u16 ButtonDown(InputState *inputs, u16 button) {
 	return (inputs->curr & button) < 1 ? 1 : 0;
 }
 
@@ -94,8 +94,8 @@ void OAM_Init() {
 	}
 }
 
-uint16_t CollideBorder(Player *player, ScreenDim *screenDim) {
-	uint16_t outOfBounds = 0;
+u16 CollideBorder(Player *player, ScreenDim *screenDim) {
+	u16 outOfBounds = 0;
 
 	if( player->x < screenDim->x ) {
 		player->x = 0;
@@ -164,6 +164,8 @@ int main(void) {
 	BIT_CLEAR(&OAM_objs[player.oamIdx]->attr1, ATTR1_FLIPVERT);
 	BIT_SET(&OAM_objs[player.oamIdx]->attr1, 1, ATTR1_OBJSIZE);
 
+	fp_t GravityPerFrame = FP(0, 0x4000);
+
 	// Main loop
     while(1)
 	{
@@ -172,13 +174,13 @@ int main(void) {
 
 		if( ButtonPressed(&inputs, KEYPAD_A) )
 		{
-			player.velY = -8;
+			player.velY = INT2FP(-4);
 		}
 
 		// Get the sprite to move
-		player.velY += 1; // TODO:figure out how to make the player fall slower
-		if( (int16_t)player.y + (int16_t)player.velY > 0 ) {
-			player.y += player.velY;
+		player.velY += GravityPerFrame;
+		if( (s16)player.y + FP2INT(player.velY) > 0 ) {
+			player.y += FP2INT(player.velY);
 		}
 		else {
 			player.y = 0;

@@ -5,6 +5,11 @@
 #define _GBA_DEFINES_
 
 
+typedef uint16_t u16;
+typedef  int16_t s16;
+typedef uint32_t u32;
+typedef  int32_t s32;
+
 #define RGB(r,g,b) (uint16_t)((r << 0) + (g << 5) + (b << 10))
 
 #define VCOUNT_MEM   ((volatile uint16_t *)0x04000006)
