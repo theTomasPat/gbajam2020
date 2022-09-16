@@ -21,7 +21,7 @@ OBJCOPY := $(PREFIX)objcopy
 ARCH := -mthumb-interwork -mthumb
 SPECS := -specs=gba.specs
 
-CFLAGS := $(ARCH) -O2 -Wall -fno-strict-aliasing
+CFLAGS := $(ARCH) -std=c99 -O0 -Wall -fno-strict-aliasing
 LDFLAGS := $(ARCH) $(SPECS)
 
 
