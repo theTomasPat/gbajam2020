@@ -1,9 +1,12 @@
 #include <stdint.h>
 #include <string.h>
 #include "gba.h"
+#include "mgba.h"
 #include "fixed.h"
 #include "256Palette.h"
 #include "Bat.h"
+
+
 
 #define LENGTH(arr) (sizeof(arr) / sizeof(arr[0]))
 
@@ -135,6 +138,8 @@ void Vsync() {
 
 
 int main(void) {
+	mgba_open();
+
 	// Initialize display control register
 	*REG_DISPCNT &= ~(1 << 0b111);
 	BIT_SET(REG_DISPCNT, 1, DISPCNT_OBJMAPPING); // 1D
@@ -152,7 +157,7 @@ int main(void) {
 	memcpy(OBJPAL_MEM, Pal256, PalLen256);
 
 	ScreenDim screenDim = (ScreenDim){ 0, 0, 240, 160 };
-	Player player = (Player){ 0, 120, 80, 16, 16, 0, 0 };
+	Player player = (Player){ 0, 60, 80, 16, 16, 0, 0 };
 
 	// copy the sprite data to 0x06010000
 	memcpy(&tile8_mem[4][0], BatTiles, BatTilesLen);
@@ -165,6 +170,9 @@ int main(void) {
 	BIT_SET(&OAM_objs[player.oamIdx]->attr1, 1, ATTR1_OBJSIZE);
 
 	fp_t GravityPerFrame = FP(0, 0x4000);
+
+	// print a debug message, viewable in mGBA
+	mgba_printf(DEBUG_DEBUG, "Hey GameBoy", 11);
 
 	// Main loop
     while(1)
@@ -188,6 +196,9 @@ int main(void) {
 		CollideBorder(&player, &screenDim);
 		UpdateOBJPos(OAM_objs[player.oamIdx], player.x, player.y); 
 	}
+
+	// disable mGBA debugging
+	mgba_close();
 
     return 0;
 }

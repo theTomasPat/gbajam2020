@@ -1,9 +1,7 @@
+#ifndef __GBA_DEFINES_
+#define __GBA_DEFINES_
+
 #include <stdint.h>
-
-
-#ifndef _GBA_DEFINES_
-#define _GBA_DEFINES_
-
 
 typedef uint16_t u16;
 typedef  int16_t s16;
@@ -86,7 +84,7 @@ typedef  int32_t s32;
 
 
 // Keypad
-volatile uint16_t *KEYINPUT = (uint16_t *)0x04000130;
+#define KEYINPUT (volatile u16 *)0x04000130;
 
 // Keypad, shift amounts
 #define KEYPAD_A (1 << 0)
@@ -99,6 +97,7 @@ volatile uint16_t *KEYINPUT = (uint16_t *)0x04000130;
 #define KEYPAD_D (1 << 7)
 #define KEYPAD_RS (1 << 8)
 #define KEYPAD_LS (1 << 9)
+
 
 
 #endif
