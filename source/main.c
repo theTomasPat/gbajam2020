@@ -4,7 +4,7 @@
 #include "mgba.h"
 #include "fixed.h"
 #include "256Palette.h"
-#include "Bat.h"
+#include "Robo.h"
 
 
 
@@ -100,21 +100,28 @@ void OAM_Init() {
 u16 CollideBorder(Player *player, ScreenDim *screenDim) {
 	u16 outOfBounds = 0;
 
+	// check left
 	if( player->x < screenDim->x ) {
 		player->x = 0;
 		player->velX = 0;
 		outOfBounds = 1;
 	}
+
+	// check right
 	if( player->x + player->w > screenDim->w ) {
 		player->x = screenDim->y - player->x;
 		player->velX = 0;
 		outOfBounds = 1;
 	}
+
+	// check top
 	if( player->y < screenDim->y ) {
 		player->y = 0;
 		player->velY = 0;
 		outOfBounds = 1;
 	}
+
+	// check bottom
 	if( player->y + player->h > screenDim->h ) {
 		player->y = screenDim->h - player->h;
 		player->velY = 0;
@@ -153,12 +160,23 @@ int main(void) {
 	OAM_objs[0] = (OBJ_ATTR *)OAM_MEM;
 	OAM_Init();
 
-	// copy the palette data to 0x05000200
+	// copy the palette data to 0x05000200 (OBJ palette)
 	memcpy(OBJPAL_MEM, Pal256, PalLen256);
 
 	ScreenDim screenDim = (ScreenDim){ 0, 0, 240, 160 };
-	Player player = (Player){ 0, 60, 80, 16, 16, 0, 0 };
+	Player player = (Player){ 0, 60, 80, 32, 32, 0, 0 };
+	
+	// copy the sprite data to 0x06010000
+	memcpy(&tile8_mem[4][0], RoboTiles, RoboTilesLen);
 
+	// setup the bat's sprite
+	BIT_SET(&OAM_objs[player.oamIdx]->attr0, 1, ATTR0_COLORMODE);
+	BIT_CLEAR(&OAM_objs[player.oamIdx]->attr0, ATTR0_DISABLE);
+	BIT_CLEAR(&OAM_objs[player.oamIdx]->attr1, ATTR1_FLIPHOR);
+	BIT_CLEAR(&OAM_objs[player.oamIdx]->attr1, ATTR1_FLIPVERT);
+	BIT_SET(&OAM_objs[player.oamIdx]->attr1, 2, ATTR1_OBJSIZE);
+
+	#if 0
 	// copy the sprite data to 0x06010000
 	memcpy(&tile8_mem[4][0], BatTiles, BatTilesLen);
 
@@ -168,6 +186,7 @@ int main(void) {
 	BIT_CLEAR(&OAM_objs[player.oamIdx]->attr1, ATTR1_FLIPHOR);
 	BIT_CLEAR(&OAM_objs[player.oamIdx]->attr1, ATTR1_FLIPVERT);
 	BIT_SET(&OAM_objs[player.oamIdx]->attr1, 1, ATTR1_OBJSIZE);
+	#endif
 
 	fp_t GravityPerFrame = FP(0, 0x4000);
 
