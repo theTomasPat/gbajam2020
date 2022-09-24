@@ -23,10 +23,12 @@ typedef struct {
 typedef struct { u32 data[8];  } TILE4;
 typedef struct { u32 data[16]; } TILE8;
 
-// each "bank" of tiles occupies 16KB, for 32byte tiles, that's 512 per bank
+// Charblocks make up 16Kb chunks of memory, starting at 0x06000000
+// there are 6 blocks total
+// blocks 0-3 are for BG tiles
+// blocks 4-5 are for OBJ tiles
 typedef TILE4 CHARBLOCK[512];
 typedef TILE8 CHARBLOCK8[256];
-
 #define tile_mem  ( (CHARBLOCK*)0x06000000)
 #define tile8_mem ((CHARBLOCK8*)0x06000000)
 
@@ -149,7 +151,14 @@ int main(void) {
 	BIT_SET(REG_DISPCNT, 1, DISPCNT_OBJMAPPING_SHIFT); // 1D mapping
 	BIT_SET(REG_DISPCNT, 1, DISPCNT_OBJFLAG_SHIFT); // show OBJs
 
-	BIT_SET(BG0CNT, 1, BGXCNT_COLORMODE);
+	// Initialize BG0's attributes
+	u32 bgMapBaseBlock = 28;
+	u32 bgCharBaseBlock = 0;
+	*BG0CNT = 0;
+	BIT_SET(BG0CNT, 1, BGXCNT_COLORMODE); // 256 color palette
+	BIT_SET(BG0CNT, bgCharBaseBlock, 2);  // select bg tile base block
+	BIT_SET(BG0CNT, bgMapBaseBlock, 8); // select bg map base block
+	BIT_SET(BG0CNT, 3, 14); // select map size (64x64 tiles, or 4x 32x32-tile screens)
 
 	InputState inputs = (InputState){0};
 
@@ -157,7 +166,8 @@ int main(void) {
 	OAM_objs[0] = (OBJ_ATTR *)OAM_MEM;
 	OAM_Init();
 
-	// copy the palette data to 0x05000200 (OBJ palette)
+	// copy the palette data to the BG and OBJ palettes
+	memcpy(BGPAL_MEM, Pal256, PalLen256);
 	memcpy(OBJPAL_MEM, Pal256, PalLen256);
 
 	ScreenDim screenDim = (ScreenDim){ 0, 0, 240, 160 };
@@ -166,24 +176,42 @@ int main(void) {
 	// copy the sprite data to 0x06010000
 	memcpy(&tile8_mem[4][0], RoboTiles, RoboTilesLen);
 
-	// setup the bat's sprite
+	// setup the robot's sprite
 	BIT_SET(&OAM_objs[player.oamIdx]->attr0, 1, ATTR0_COLORMODE);
 	BIT_CLEAR(&OAM_objs[player.oamIdx]->attr0, ATTR0_DISABLE);
 	BIT_CLEAR(&OAM_objs[player.oamIdx]->attr1, ATTR1_FLIPHOR);
 	BIT_CLEAR(&OAM_objs[player.oamIdx]->attr1, ATTR1_FLIPVERT);
 	BIT_SET(&OAM_objs[player.oamIdx]->attr1, 2, ATTR1_OBJSIZE);
 
-	#if 0
-	// copy the sprite data to 0x06010000
-	memcpy(&tile8_mem[4][0], BatTiles, BatTilesLen);
+	// dummy tile art
+	char smileyTile[64] = {
+		0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 1, 0, 0, 1, 0, 0,
+		1, 0, 1, 0, 0, 1, 0, 1,
+		1, 0, 0, 0, 0, 0, 0, 1,
+		0, 1, 0, 0, 0, 0, 1, 0,
+		0, 0, 1, 1, 1, 1, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0,
+	};
+	memcpy(&tile8_mem[0][1], &smileyTile, 64);
 
-	// setup the bat's sprite
-	BIT_SET(&OAM_objs[player.oamIdx]->attr0, 1, ATTR0_COLORMODE);
-	BIT_CLEAR(&OAM_objs[player.oamIdx]->attr0, ATTR0_DISABLE);
-	BIT_CLEAR(&OAM_objs[player.oamIdx]->attr1, ATTR1_FLIPHOR);
-	BIT_CLEAR(&OAM_objs[player.oamIdx]->attr1, ATTR1_FLIPVERT);
-	BIT_SET(&OAM_objs[player.oamIdx]->attr1, 1, ATTR1_OBJSIZE);
-	#endif
+	
+	// TODO(complete): confirm the location of the map data in memory:
+	//       create a map tile using tile idx 1 (smiley face)
+	//       make sure that tile is in the map's first tile location
+	//       I want to see a smiley face in the top-left corner of the screen
+	typedef u16 BG_TxtMode_Tile;
+	typedef  u8 BG_RotScale_Tile;
+	typedef BG_TxtMode_Tile BG_TxtMode_ScreenBaseBlock[1024];
+	#define BG_TxtMode_Screens ((BG_TxtMode_ScreenBaseBlock*)0x06000000)
+	BG_TxtMode_Tile smileyTileIdx = (1 << 0);
+	*BG_TxtMode_Screens[0] = 0;
+	BG_TxtMode_Screens[bgMapBaseBlock + 0][0] = smileyTileIdx;
+	BG_TxtMode_Screens[bgMapBaseBlock + 1][0] = smileyTileIdx;
+	BG_TxtMode_Screens[bgMapBaseBlock + 2][0] = smileyTileIdx;
+	BG_TxtMode_Screens[bgMapBaseBlock + 3][0] = smileyTileIdx;
+
 
 	fp_t GravityPerFrame = FP(0, 0x4000);
 
