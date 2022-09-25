@@ -9,28 +9,9 @@
 #include "Robo.h"
 
 
-
 #define LENGTH(arr) (sizeof(arr) / sizeof(arr[0]))
 
-typedef struct {
-	u16 attr0;
-	u16 attr1;
-	u16 attr2;
-	u16 fill;
-} OBJ_ATTR;
 
-// data containers for each type of tile
-typedef struct { u32 data[8];  } TILE4;
-typedef struct { u32 data[16]; } TILE8;
-
-// Charblocks make up 16Kb chunks of memory, starting at 0x06000000
-// there are 6 blocks total
-// blocks 0-3 are for BG tiles
-// blocks 4-5 are for OBJ tiles
-typedef TILE4 CHARBLOCK[512];
-typedef TILE8 CHARBLOCK8[256];
-#define tile_mem  ( (CHARBLOCK*)0x06000000)
-#define tile8_mem ((CHARBLOCK8*)0x06000000)
 
 // TODO: define a bounding box for the sprite
 //       define an origin point for the sprite?
@@ -51,36 +32,6 @@ typedef struct {
 	u16 h;
 } ScreenDim;
 
-typedef struct {
-	u16 prev;
-	u16 curr;
-} InputState;
-
-// The buttons are 0 if pressed, 1 if not pressed
-u16 ButtonPressed(InputState *inputs, u16 button) {
-	// mask out the button from the prev and curr button states
-	u16 prevPressed = (inputs->prev & button);
-	u16 currPressed = (inputs->curr & button);
-
-	// since the logic for button presses is inverted, we need to check the
-	// "falling edge" to signal a button press. That means the masked input
-	// needs to be a lower value than the masked previous input in order to
-	// be considered "just pressed"
-	if( currPressed < prevPressed ) return 1;
-	return 0;
-}
-u16 ButtonUp(InputState *inputs, u16 button) {
-	return (inputs->curr & button) > 0 ? 1 : 0;
-}
-u16 ButtonDown(InputState *inputs, u16 button) {
-	return (inputs->curr & button) < 1 ? 1 : 0;
-}
-
-// Update the buffered input states
-void UpdateButtonStates(InputState *inputs) {
-	inputs->prev = inputs->curr;
-	inputs->curr = *KEYINPUT;
-}
 
 void OAM_Init() {
 	OBJ_ATTR *obj = (OBJ_ATTR *)OAM_MEM;
@@ -135,19 +86,13 @@ void UpdateOBJPos(OBJ_ATTR *obj, int x, int y) {
 	BF_SET(&obj->attr0, y, 8, ATTR0_YCOORD_SHIFT);
 }
 
-void Vsync() {
-	while(*VCOUNT_MEM >= 160);  // wait until VDraw
-	while(*VCOUNT_MEM <  160);  // wait until VBlank
-}
-
-
 int main(void) {
 	mgba_open();
 
 	// Initialize display control register
 	*REG_DISPCNT = 0;
 	BIT_CLEAR(REG_DISPCNT, DISPCNT_BGMODE_SHIFT); // set BGMode 0
-	BIT_SET(REG_DISPCNT, 1, DISPCNT_BG0FLAG_SHIFT);
+	BIT_SET(REG_DISPCNT, 1, DISPCNT_BG0FLAG_SHIFT); // turn on BG0
 	BIT_SET(REG_DISPCNT, 1, DISPCNT_OBJMAPPING_SHIFT); // 1D mapping
 	BIT_SET(REG_DISPCNT, 1, DISPCNT_OBJFLAG_SHIFT); // show OBJs
 
@@ -156,7 +101,7 @@ int main(void) {
 	u32 bgCharBaseBlock = 0;
 	*BG0CNT = 0;
 	BIT_SET(BG0CNT, 1, BGXCNT_COLORMODE); // 256 color palette
-	BIT_SET(BG0CNT, bgCharBaseBlock, 2);  // select bg tile base block
+	BIT_SET(BG0CNT, bgCharBaseBlock, BGXCNT_CHARBASEBLOCK);  // select bg tile base block
 	BIT_SET(BG0CNT, bgMapBaseBlock, 8); // select bg map base block
 	BIT_SET(BG0CNT, 3, 14); // select map size (64x64 tiles, or 4x 32x32-tile screens)
 
@@ -173,7 +118,7 @@ int main(void) {
 	ScreenDim screenDim = (ScreenDim){ 0, 0, 240, 160 };
 	Player player = (Player){ 0, 60, 80, 32, 32, 0, 0 };
 	
-	// copy the sprite data to 0x06010000
+	// copy the player sprite data to 0x06010000
 	memcpy(&tile8_mem[4][0], RoboTiles, RoboTilesLen);
 
 	// setup the robot's sprite
@@ -183,7 +128,8 @@ int main(void) {
 	BIT_CLEAR(&OAM_objs[player.oamIdx]->attr1, ATTR1_FLIPVERT);
 	BIT_SET(&OAM_objs[player.oamIdx]->attr1, 2, ATTR1_OBJSIZE);
 
-	// dummy tile art
+	
+	// dummy BG tile art
 	char smileyTile[64] = {
 		0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0,
@@ -195,16 +141,8 @@ int main(void) {
 		0, 0, 0, 0, 0, 0, 0, 0,
 	};
 	memcpy(&tile8_mem[0][1], &smileyTile, 64);
-
 	
-	// TODO(complete): confirm the location of the map data in memory:
-	//       create a map tile using tile idx 1 (smiley face)
-	//       make sure that tile is in the map's first tile location
-	//       I want to see a smiley face in the top-left corner of the screen
-	typedef u16 BG_TxtMode_Tile;
-	typedef  u8 BG_RotScale_Tile;
-	typedef BG_TxtMode_Tile BG_TxtMode_ScreenBaseBlock[1024];
-	#define BG_TxtMode_Screens ((BG_TxtMode_ScreenBaseBlock*)0x06000000)
+	// Create a basic tilemap
 	BG_TxtMode_Tile smileyTileIdx = (1 << 0);
 	*BG_TxtMode_Screens[0] = 0;
 	BG_TxtMode_Screens[bgMapBaseBlock + 0][0] = smileyTileIdx;
@@ -218,11 +156,18 @@ int main(void) {
 	// print a debug message, viewable in mGBA
 	mgba_printf(DEBUG_DEBUG, "Hey GameBoy", 11);
 
+	u16 bgHOffset = 0;
+
 	// Main loop
     while(1)
 	{
 		Vsync();
 		UpdateButtonStates(&inputs);
+
+		// scroll the BG
+		bgHOffset += 1;
+		if(bgHOffset > 511) bgHOffset -= 511;
+		*BG0HOFS = bgHOffset;
 
 		if( ButtonPressed(&inputs, KEYPAD_A) )
 		{

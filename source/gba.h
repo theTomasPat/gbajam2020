@@ -23,6 +23,7 @@ typedef  int32_t s32;
 
 // Display Control
 #define REG_DISPCNT ((uint16_t *)0x04000000)
+void Vsync();
 
 // Display Control, shift amounts
 #define DISPCNT_BGMODE_SHIFT 0
@@ -42,13 +43,13 @@ typedef  int32_t s32;
 
 
 
-// BG Control
-#define BG0CNT ((uint16_t *)0x04000008)
-#define BG1CNT ((uint16_t *)0x0400000A)
-#define BG2CNT ((uint16_t *)0x0400000C)
-#define BG3CNT ((uint16_t *)0x0400000E)
+// BG Control Registers
+#define BG0CNT ((u16 *)0x04000008)
+#define BG1CNT ((u16 *)0x0400000A)
+#define BG2CNT ((u16 *)0x0400000C)
+#define BG3CNT ((u16 *)0x0400000E)
 
-// BG Control, shift amounts
+// BG Control Registers, shift amounts
 #define BGXCNT_PRIORITY 0
 #define BGXCNT_CHARBASEBLOCK 2
 #define BGXCNT_MOSAIC 6
@@ -57,6 +58,45 @@ typedef  int32_t s32;
 #define BGXCNT_DISPAREAOVERFLOW 13
 #define BGXCNT_SCREENSIZE 14
 
+// BG Scrolling Registers
+// each of these is write-only
+#define BG0HOFS ((u16 *)0x04000010)
+#define BG0VOFS ((u16 *)0x04000012)
+#define BG1HOFS ((u16 *)0x04000014)
+#define BG1VOFS ((u16 *)0x04000016)
+#define BG2HOFS ((u16 *)0x04000018)
+#define BG2VOFS ((u16 *)0x0400001A)
+#define BG3HOFS ((u16 *)0x0400001C)
+#define BG3VOFS ((u16 *)0x0400001E)
+
+// BG map setup
+typedef u16 BG_TxtMode_Tile;
+typedef  u8 BG_RotScale_Tile;
+typedef BG_TxtMode_Tile BG_TxtMode_ScreenBaseBlock[1024];
+#define BG_TxtMode_Screens ((BG_TxtMode_ScreenBaseBlock*)0x06000000)
+
+
+
+// data containers for each type of tile
+typedef struct { u32 data[8];  } TILE4;
+typedef struct { u32 data[16]; } TILE8;
+
+// Charblocks make up 16Kb chunks of memory, starting at 0x06000000
+// there are 6 blocks total
+// blocks 0-3 are for BG tiles
+// blocks 4-5 are for OBJ tiles
+typedef TILE4 CHARBLOCK[512];
+typedef TILE8 CHARBLOCK8[256];
+#define tile_mem  ( (CHARBLOCK*)0x06000000)
+#define tile8_mem ((CHARBLOCK8*)0x06000000)
+
+
+typedef struct {
+	u16 attr0;
+	u16 attr1;
+	u16 attr2;
+	u16 fill;
+} OBJ_ATTR;
 
 // OAM OBJ Control, shift amounts
 #define ATTR0_ROTSCALEFLAG 8
@@ -100,6 +140,15 @@ typedef  int32_t s32;
 #define KEYPAD_RS (1 << 8)
 #define KEYPAD_LS (1 << 9)
 
+// Input convenience functions
+typedef struct {
+	u16 prev;
+	u16 curr;
+} InputState;
+u16 ButtonPressed(InputState *inputs, u16 button);
+u16 ButtonUp(InputState *inputs, u16 button);
+u16 ButtonDown(InputState *inputs, u16 button);
+void UpdateButtonStates(InputState *inputs);
 
 
 #endif
