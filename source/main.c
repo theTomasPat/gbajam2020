@@ -156,7 +156,8 @@ int main(void) {
 	// print a debug message, viewable in mGBA
 	mgba_printf(DEBUG_DEBUG, "Hey GameBoy", 11);
 
-	u16 bgHOffset = 0;
+	fp_t bgHOffset = 0;
+	fp_t bgHOffsetRate = FP(0, 0x4000);
 
 	// Main loop
     while(1)
@@ -165,9 +166,9 @@ int main(void) {
 		UpdateButtonStates(&inputs);
 
 		// scroll the BG
-		bgHOffset += 1;
-		if(bgHOffset > 511) bgHOffset -= 511;
-		*BG0HOFS = bgHOffset;
+		bgHOffset += bgHOffsetRate;
+		if(bgHOffset > FP(511,0)) bgHOffset -= FP(511,0);
+		*BG0HOFS = FP2INT(bgHOffset);
 
 		if( ButtonPressed(&inputs, KEYPAD_A) )
 		{
