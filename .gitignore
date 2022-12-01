@@ -1,5 +1,8 @@
 # Project-specific
 build/
+compile_commands.json
+.clangd
+.ccls-cache/
 
 
 # Created by https://www.toptal.com/developers/gitignore/api/windows,linux,macos,vim
