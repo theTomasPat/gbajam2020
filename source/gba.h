@@ -96,7 +96,7 @@ typedef struct {
 	u16 attr1;
 	u16 attr2;
 	u16 fill;
-} OBJ_ATTR;
+} __attribute__((aligned(4))) OBJ_ATTR;
 
 // OAM OBJ Control, shift amounts
 #define ATTR0_ROTSCALEFLAG 8
@@ -109,6 +109,7 @@ typedef struct {
 
 #define ATTR0_YCOORD_SHIFT 0
 #define ATTR0_YCOORD_MASK 0xFF
+#define ATTR0_YCOORD_LEN 8
 #define ATTR0_YCOORD(n) ((n) << ATTR0_YCOORD_SHIFT)
 
 #define ATTR1_ROTSCALEPARAM 9
@@ -118,6 +119,7 @@ typedef struct {
 
 #define ATTR1_XCOORD_SHIFT 0
 #define ATTR1_XCOORD_MASK 0xFF
+#define ATTR1_XCOORD_LEN 9
 #define ATTR1_XCOORD(n) ((n) << ATTR1_XCOORD_SHIFT)
 
 #define ATTR2_CHARNAME 0

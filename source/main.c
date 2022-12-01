@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "gba.h"
 #include "mgba.h"
@@ -7,6 +8,7 @@
 #include "fixed.h"
 #include "256Palette.h"
 #include "Robo.h"
+#include "ObstacleTop_End.h"
 
 
 #define LENGTH(arr) (sizeof(arr) / sizeof(arr[0]))
@@ -15,7 +17,7 @@
 
 // TODO: define a bounding box for the sprite
 //       define an origin point for the sprite?
-typedef struct {
+typedef struct Player {
 	u32 oamIdx;
 	u32 x:9;
 	u32 y:8;
@@ -25,12 +27,19 @@ typedef struct {
 	fp_t velY;
 } __attribute__((aligned (4))) Player;
 
-typedef struct {
+typedef struct ScreenDim {
 	u16 x;
 	u16 y;
 	u16 w;
 	u16 h;
 } ScreenDim;
+
+typedef struct Obstacle {
+    u32 active;
+	u32 x;
+	u32 y;
+	u32 gapSize;
+} Obstacle;
 
 
 void OAM_Init() {
@@ -82,8 +91,8 @@ u16 CollideBorder(Player *player, ScreenDim *screenDim) {
 }
 
 void UpdateOBJPos(OBJ_ATTR *obj, int x, int y) {
-	BF_SET(&obj->attr1, x, 9, ATTR1_XCOORD_SHIFT);
-	BF_SET(&obj->attr0, y, 8, ATTR0_YCOORD_SHIFT);
+	BF_SET(&obj->attr1, x, ATTR1_XCOORD_LEN, ATTR1_XCOORD_SHIFT);
+	BF_SET(&obj->attr0, y, ATTR0_YCOORD_LEN, ATTR0_YCOORD_SHIFT);
 }
 
 int main(void) {
@@ -107,8 +116,8 @@ int main(void) {
 
 	InputState inputs = (InputState){0};
 
-	OBJ_ATTR *OAM_objs[128];
-	OAM_objs[0] = (OBJ_ATTR *)OAM_MEM;
+	OBJ_ATTR *OAM_objs;
+	OAM_objs = (OBJ_ATTR *)OAM_MEM;
 	OAM_Init();
 
 	// copy the palette data to the BG and OBJ palettes
@@ -122,14 +131,33 @@ int main(void) {
 	memcpy(&tile8_mem[4][0], RoboTiles, RoboTilesLen);
 
 	// setup the robot's sprite
-	BIT_SET(&OAM_objs[player.oamIdx]->attr0, 1, ATTR0_COLORMODE);
-	BIT_CLEAR(&OAM_objs[player.oamIdx]->attr0, ATTR0_DISABLE);
-	BIT_CLEAR(&OAM_objs[player.oamIdx]->attr1, ATTR1_FLIPHOR);
-	BIT_CLEAR(&OAM_objs[player.oamIdx]->attr1, ATTR1_FLIPVERT);
-	BIT_SET(&OAM_objs[player.oamIdx]->attr1, 2, ATTR1_OBJSIZE);
+	BIT_SET(&OAM_objs[player.oamIdx].attr0, 1, ATTR0_COLORMODE);
+	BIT_CLEAR(&OAM_objs[player.oamIdx].attr0, ATTR0_DISABLE);
+	BIT_CLEAR(&OAM_objs[player.oamIdx].attr1, ATTR1_FLIPHOR);
+	BIT_CLEAR(&OAM_objs[player.oamIdx].attr1, ATTR1_FLIPVERT);
+	BIT_SET(&OAM_objs[player.oamIdx].attr1, 2, ATTR1_OBJSIZE);
+
+
+	// TODO: finish setting up additional sprites
+	// this one is for the obstacles
+	// TODO: generalize adding sprites to avoid maintaining hardcoded values
+
+	// copy the obstacle image data into VRAM
+	memcpy(&tile8_mem[4][16], ObstacleTop_EndTiles, ObstacleTop_EndTilesLen);
+	char msg[128];
+	sprintf(msg, "obstacle tile address: %p\n", &OAM_objs[2]);
+	mgba_printf(DEBUG_DEBUG, msg, 128);
+	// setup the obstacle sprite in OAM
+	BIT_SET(&OAM_objs[2].attr0, 1, ATTR0_COLORMODE);
+	BIT_CLEAR(&OAM_objs[2].attr0, ATTR0_DISABLE);
+	BIT_SET(&OAM_objs[2].attr1, 2, ATTR1_OBJSIZE);
+	// TODO: the starting tile is #16 in the tile set but the char name for
+	// this sprite needs to be 32... why? what is a "char name" (attr2)?
+	BIT_SET(&OAM_objs[2].attr2, 32, ATTR2_CHARNAME);
 
 	
 	// dummy BG tile art
+	// the number corresponds to the color idx in the palette
 	char smileyTile[64] = {
 		0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0,
@@ -159,6 +187,13 @@ int main(void) {
 	fp_t bgHOffset = 0;
 	fp_t bgHOffsetRate = FP(0, 0x4000);
 
+	// create an obstacle
+	Obstacle obstacle = {0};
+    obstacle.active = 1;
+	obstacle.x = 300;
+	obstacle.y = 75;
+	obstacle.gapSize = 64;
+
 	// Main loop
     while(1)
 	{
@@ -166,17 +201,19 @@ int main(void) {
 		UpdateButtonStates(&inputs);
 
 		// scroll the BG
+		// BG0HOFS is write-only so we need an extra variable (bgHOffset)
+		// to keep track of where the BG should be and assign that to
+		// the register
 		bgHOffset += bgHOffsetRate;
-		if(bgHOffset > FP(511,0)) bgHOffset -= FP(511,0);
+		if(bgHOffset > FP(511,0)) { bgHOffset -= FP(511,0); }
 		*BG0HOFS = FP2INT(bgHOffset);
 
-		if( ButtonPressed(&inputs, KEYPAD_A) )
+		// move player
+		player.velY += GravityPerFrame;
+		if(ButtonPressed(&inputs, KEYPAD_A))
 		{
 			player.velY = INT2FP(-4);
 		}
-
-		// Get the sprite to move
-		player.velY += GravityPerFrame;
 		if( (s16)player.y + FP2INT(player.velY) > 0 ) {
 			player.y += FP2INT(player.velY);
 		}
@@ -184,7 +221,18 @@ int main(void) {
 			player.y = 0;
 		}
 		CollideBorder(&player, &screenDim);
-		UpdateOBJPos(OAM_objs[player.oamIdx], player.x, player.y); 
+
+		// update the player sprite
+		UpdateOBJPos(&OAM_objs[player.oamIdx], player.x, player.y); 
+
+		// update the obstacle
+		// TODO: use fp_t for obstacle coords?
+		obstacle.x -= 1;
+        if(obstacle.x <= 0)
+        {
+            obstacle.x = 300;
+        }
+        UpdateOBJPos(&OAM_objs[2], obstacle.x, obstacle.y);
 	}
 
 	// disable mGBA debugging

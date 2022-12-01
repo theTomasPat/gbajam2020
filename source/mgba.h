@@ -1,3 +1,7 @@
+// mGBA debug API info can be found here:
+// https://github.com/mgba-emu/mgba/blob/master/opt/libgba/mgba.c
+
+
 #ifndef __MGBA__
 #define __MGBA__
 
