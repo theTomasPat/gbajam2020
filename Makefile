@@ -21,7 +21,7 @@ OBJCOPY := $(PREFIX)objcopy
 ARCH := -mthumb-interwork -mthumb
 SPECS := -specs=gba.specs
 
-CFLAGS := $(ARCH) -std=c99 -O0 -Wall -fno-strict-aliasing -D __DEBUG__
+CFLAGS := $(ARCH) -std=c99 -O0 -Wall -fno-strict-aliasing -D __DEBUG__ -IC:/devkitPro/devkitARM/arm-none-eabi/include -I./source
 LDFLAGS := $(ARCH) $(SPECS)
 
 

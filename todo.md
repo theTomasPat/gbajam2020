@@ -4,6 +4,7 @@
 	[x] Makefile
 	[x] Git
 	[x] script to quickly setup dev environment
+	[x] `intercept-build` (part of scan-build) to generate compile_commands
 
 [x] Draw a sprite to the screen
 	[x] create bat sprite
