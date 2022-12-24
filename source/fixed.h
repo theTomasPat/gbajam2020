@@ -10,7 +10,7 @@
 // largest uint value is 2^16 = 65535
 // smallest possible value is 2^-16 = 0.00001526...
 
-typedef s32 fp_t;
+typedef i32 fp_t;
 typedef u32 fpu_t;
 
 #define FP_FRACBITS 16

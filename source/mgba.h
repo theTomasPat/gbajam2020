@@ -19,9 +19,11 @@
 #define DEBUG_INFO 3
 #define DEBUG_DEBUG 4
 
+#define DEBUG_MSG_LEN 256
+
 int mgba_open();
 void mgba_close();
-void mgba_printf(u32 level, char *str, u32 len);
+void mgba_printf(u32 level, char *str);
 
 
 #endif

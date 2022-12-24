@@ -4,13 +4,16 @@
 #include <stdint.h>
 
 typedef  uint8_t  u8;
-typedef   int8_t  s8;
+typedef   int8_t  i8;
 typedef uint16_t u16;
-typedef  int16_t s16;
+typedef  int16_t i16;
 typedef uint32_t u32;
-typedef  int32_t s32;
+typedef  int32_t i32;
 
 #define RGB(r,g,b) (uint16_t)((r << 0) + (g << 5) + (b << 10))
+
+#define SCREEN_WIDTH 240
+#define SCREEN_HEIGHT 160
 
 #define VCOUNT_MEM   ((volatile uint16_t *)0x04000006)
 #define DISPSTAT_MEM ((volatile uint16_t *)0x04000004)

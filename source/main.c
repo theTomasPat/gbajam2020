@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "gba.h"
 #include "mgba.h"
@@ -9,10 +10,19 @@
 #include "256Palette.h"
 #include "Robo.h"
 #include "ObstacleTop_End.h"
+#include "ObstacleTop_Tile.h"
 
 
-#define LENGTH(arr) (sizeof(arr) / sizeof(arr[0]))
+#define ARR_LENGTH(arr) (sizeof(arr) / sizeof(arr[0]))
 
+#ifdef __DEBUG__
+#define ASSERT(expr) if(!(expr)) { *(uint8_t*)0x4000301 = 1; }
+#else
+#define ASSERT(expr)
+#endif
+
+#define OBJMAXX 511
+#define OBJMAXY 255
 
 
 // TODO: define a bounding box for the sprite
@@ -34,14 +44,66 @@ typedef struct ScreenDim {
 	u16 h;
 } ScreenDim;
 
-typedef struct Obstacle {
-    u32 active;
-	u32 x;
-	u32 y;
+typedef struct ObstacleTile {
+    u32 oamIdx;
+	i32 y;
 	u32 gapSize;
+    u32 active;
+} ObstacleTile;
+
+#define MAX_TILES_LEN 4
+typedef struct Obstacle {
+	i32 x;
+	i32 y;
+	u32 gapSize;
+    u32 active;
+    ObstacleTile tilesTop[MAX_TILES_LEN];
+    ObstacleTile tilesBottom[MAX_TILES_LEN];
 } Obstacle;
 
+typedef struct OBJPool {
+    i32* indexes;
+    i32 length;
+    i32 poolIdx;
+} OBJPool;
 
+OBJPool OBJPool_Create(i32 oamStartIdx, i32 len)
+{
+    // since there's only 128 OAM objs available,
+    // make sure the pool doesn't go beyond that
+    ASSERT(oamStartIdx + len <= 128);
+
+    OBJPool Result = {0};
+    Result.indexes = malloc(sizeof(i32) * len);
+    for(size_t i = 0; i < len; i++)
+    {
+        Result.indexes[i] = oamStartIdx + i;
+    }
+    Result.length = len;
+    Result.poolIdx = 0;
+
+    return Result;
+}
+
+// return the current index number and then internally
+// increment it in the given struct
+i32 OBJPool_GetNextIdx(OBJPool* pool)
+{
+    i32 Result = pool->poolIdx;
+
+    pool->poolIdx++;
+    if(pool->poolIdx >= pool->length)
+    {
+        pool->poolIdx = 0;
+    }
+
+    return Result;
+}
+
+
+// Go through all 128 OAM entries and for each of them,
+// zero them out and disable them. This prevents a mess of
+// sprites from appearing at 0,0 on initialization
 void OAM_Init() {
 	OBJ_ATTR *obj = (OBJ_ATTR *)OAM_MEM;
 
@@ -96,7 +158,10 @@ void UpdateOBJPos(OBJ_ATTR *obj, int x, int y) {
 }
 
 int main(void) {
+#ifdef __DEBUG__
 	mgba_open();
+    char debug_msg[DEBUG_MSG_LEN];
+#endif
 
 	// Initialize display control register
 	*REG_DISPCNT = 0;
@@ -111,51 +176,53 @@ int main(void) {
 	*BG0CNT = 0;
 	BIT_SET(BG0CNT, 1, BGXCNT_COLORMODE); // 256 color palette
 	BIT_SET(BG0CNT, bgCharBaseBlock, BGXCNT_CHARBASEBLOCK);  // select bg tile base block
-	BIT_SET(BG0CNT, bgMapBaseBlock, 8); // select bg map base block
-	BIT_SET(BG0CNT, 3, 14); // select map size (64x64 tiles, or 4x 32x32-tile screens)
+	BIT_SET(BG0CNT, bgMapBaseBlock, BGXCNT_SCRNBASEBLOCK); // select bg map base block
+	BIT_SET(BG0CNT, 2, BGXCNT_SCREENSIZE); // select map size (64x32 tiles, or 2x 32x32-tile screens, side-by-side)
 
+    // setup important scene objects
 	InputState inputs = (InputState){0};
-
-	OBJ_ATTR *OAM_objs;
-	OAM_objs = (OBJ_ATTR *)OAM_MEM;
-	OAM_Init();
+	ScreenDim screenDim = (ScreenDim){ 0, 0, 240, 160 };
+	Player player = (Player){ 0, 60, 80, 32, 32, 0, 0 };
+    OBJPool obstaclePool = OBJPool_Create(118, 10);
 
 	// copy the palette data to the BG and OBJ palettes
 	memcpy(BGPAL_MEM, Pal256, PalLen256);
 	memcpy(OBJPAL_MEM, Pal256, PalLen256);
 
-	ScreenDim screenDim = (ScreenDim){ 0, 0, 240, 160 };
-	Player player = (Player){ 0, 60, 80, 32, 32, 0, 0 };
-	
-	// copy the player sprite data to 0x06010000
+    // copy all sprite data into VRAM
 	memcpy(&tile8_mem[4][0], RoboTiles, RoboTilesLen);
+	memcpy(&tile8_mem[4][16], ObstacleTop_EndTiles, ObstacleTop_EndTilesLen);
+	memcpy(&tile8_mem[4][32], ObstacleTop_TileTiles, ObstacleTop_TileTilesLen);
+
+    // initialize OAM items
+	OBJ_ATTR *OAM_objs;
+	OAM_objs = (OBJ_ATTR *)OAM_MEM;
+	OAM_Init();
 
 	// setup the robot's sprite
 	BIT_SET(&OAM_objs[player.oamIdx].attr0, 1, ATTR0_COLORMODE);
 	BIT_CLEAR(&OAM_objs[player.oamIdx].attr0, ATTR0_DISABLE);
-	BIT_CLEAR(&OAM_objs[player.oamIdx].attr1, ATTR1_FLIPHOR);
-	BIT_CLEAR(&OAM_objs[player.oamIdx].attr1, ATTR1_FLIPVERT);
 	BIT_SET(&OAM_objs[player.oamIdx].attr1, 2, ATTR1_OBJSIZE);
+	BIT_SET(&OAM_objs[player.oamIdx].attr2, 0, ATTR2_CHARNAME);
 
+#ifdef __DEBUG__
+    // test the OBJPool system by making sure the index numbers
+    // wrap properly within the pool and also by filling the
+    // OAM objs using the pool
+    for(size_t i = 0; i < 15; i++)
+    {
+        i32 poolIdx = OBJPool_GetNextIdx(&obstaclePool);
+        i32 objIdx = obstaclePool.indexes[poolIdx];
+        snprintf(debug_msg, DEBUG_MSG_LEN,
+                "obstaclePool[%ld]: %ld",
+                poolIdx, objIdx);
+        mgba_printf(DEBUG_DEBUG, debug_msg);
+        BIT_SET(&OAM_objs[objIdx].attr0, 1, ATTR0_COLORMODE);
+        BIT_SET(&OAM_objs[objIdx].attr1, 2, ATTR1_OBJSIZE);
+        BIT_SET(&OAM_objs[objIdx].attr2, 0, ATTR2_CHARNAME);
+    }
+#endif
 
-	// TODO: finish setting up additional sprites
-	// this one is for the obstacles
-	// TODO: generalize adding sprites to avoid maintaining hardcoded values
-
-	// copy the obstacle image data into VRAM
-	memcpy(&tile8_mem[4][16], ObstacleTop_EndTiles, ObstacleTop_EndTilesLen);
-	char msg[128];
-	sprintf(msg, "obstacle tile address: %p\n", &OAM_objs[2]);
-	mgba_printf(DEBUG_DEBUG, msg, 128);
-	// setup the obstacle sprite in OAM
-	BIT_SET(&OAM_objs[2].attr0, 1, ATTR0_COLORMODE);
-	BIT_CLEAR(&OAM_objs[2].attr0, ATTR0_DISABLE);
-	BIT_SET(&OAM_objs[2].attr1, 2, ATTR1_OBJSIZE);
-	// TODO: the starting tile is #16 in the tile set but the char name for
-	// this sprite needs to be 32... why? what is a "char name" (attr2)?
-	BIT_SET(&OAM_objs[2].attr2, 32, ATTR2_CHARNAME);
-
-	
 	// dummy BG tile art
 	// the number corresponds to the color idx in the palette
 	char smileyTile[64] = {
@@ -175,24 +242,93 @@ int main(void) {
 	*BG_TxtMode_Screens[0] = 0;
 	BG_TxtMode_Screens[bgMapBaseBlock + 0][0] = smileyTileIdx;
 	BG_TxtMode_Screens[bgMapBaseBlock + 1][0] = smileyTileIdx;
-	BG_TxtMode_Screens[bgMapBaseBlock + 2][0] = smileyTileIdx;
-	BG_TxtMode_Screens[bgMapBaseBlock + 3][0] = smileyTileIdx;
+	//BG_TxtMode_Screens[bgMapBaseBlock + 2][0] = smileyTileIdx;
+	//BG_TxtMode_Screens[bgMapBaseBlock + 3][0] = smileyTileIdx;
 
 
 	fp_t GravityPerFrame = FP(0, 0x4000);
 
+#ifdef __DEBUG__
 	// print a debug message, viewable in mGBA
-	mgba_printf(DEBUG_DEBUG, "Hey GameBoy", 11);
+	mgba_printf(DEBUG_DEBUG, "Hey GameBoy");
+#endif
 
 	fp_t bgHOffset = 0;
 	fp_t bgHOffsetRate = FP(0, 0x4000);
 
 	// create an obstacle
+#define OBSTACLE_START_X 275
 	Obstacle obstacle = {0};
-    obstacle.active = 1;
-	obstacle.x = 300;
+	obstacle.x = OBSTACLE_START_X;
 	obstacle.y = 75;
 	obstacle.gapSize = 64;
+    obstacle.active = 1;
+    // TODO: create the obstacle tiles using `obstaclePool`
+    obstacle.tilesTop[0].oamIdx = 2;
+    obstacle.tilesTop[0].y = obstacle.y - (obstacle.gapSize / 2) - 32; // 32 is sprite height
+    obstacle.tilesTop[0].active = 1;
+    obstacle.tilesBottom[0].oamIdx = 3;
+    obstacle.tilesBottom[0].y = obstacle.y + (obstacle.gapSize / 2);
+    obstacle.tilesBottom[0].active = 1;
+
+
+    // TODO: create OAM objs for the top half of the obstacles;
+    //       one for the end of the obstacle at:
+    //           obstacle.y - (obstacle.gap / 2 ) - <sprite height>
+    //       calculate the number of tiling sprites for the rest
+    //       of the top-half, each at:
+    //           <sprite height = 32>
+    //           obstacle.y - (obstacle.gap / 2) - (<sprite height> * i)
+    // TODO: create OAM objs for the btm half of the obstacles;
+    //       one for the end of the obstacle at:
+    //           obstacle.y + <sprite height>
+    //       calculate the number of tiling sprites for the rest
+    //       of the btm-half, each at:
+    //           <sprite height = 32>
+    //           obstacle.y + (obstacle.gap / 2) + (<sprite height> * i)
+    //       optionally, use the same art on the bottom as the top,
+    //           but flipped vertically
+
+    // calculate the number of tiles needed on the top
+    // the division will truncate the number which means that we need to add 1 to make sure
+    //     there's a tile that will reach the edge of the screen
+    i32 numTilesToTopBorder = obstacle.tilesTop[0].y / 32 + 1;
+#ifdef __DEBUG__
+    snprintf(debug_msg, DEBUG_MSG_LEN, "Number top tiles: %ld\n", numTilesToTopBorder);
+    mgba_printf(DEBUG_DEBUG, debug_msg);
+#endif
+
+    // calculate the number of tiles needed on the btm
+    i32 numTilesToBtmBorder = (SCREEN_HEIGHT - (obstacle.y + (obstacle.gapSize / 2) + 32)) / 32 + 1;
+#ifdef __DEBUG__
+    snprintf(debug_msg, DEBUG_MSG_LEN, "Number btm tiles: %ld\n", numTilesToBtmBorder);
+    mgba_printf(DEBUG_DEBUG, debug_msg);
+#endif
+
+    // TODO: setup the OAM objs for each of the obstacle tiles
+	// TODO: generalize adding sprites to avoid maintaining hardcoded values
+	// setup the obstacle sprite in OAM
+    // obstacle tile #1
+	BIT_SET(&OAM_objs[2].attr0, 1, ATTR0_COLORMODE);
+	BIT_CLEAR(&OAM_objs[2].attr0, ATTR0_DISABLE);
+	BIT_SET(&OAM_objs[2].attr1, 2, ATTR1_OBJSIZE);
+	// TODO: the starting tile is #16 in the tile set but the char name for
+	// this sprite needs to be 32... why? what is a "char name" (attr2)?
+	BIT_SET(&OAM_objs[2].attr2, 32, ATTR2_CHARNAME);
+    // obstacle tile #2
+	BIT_SET(&OAM_objs[3].attr0, 1, ATTR0_COLORMODE);
+	BIT_CLEAR(&OAM_objs[3].attr0, ATTR0_DISABLE);
+	BIT_SET(&OAM_objs[3].attr1, 2, ATTR1_OBJSIZE);
+	BIT_SET(&OAM_objs[3].attr2, 32, ATTR2_CHARNAME);
+	BIT_SET(&OAM_objs[3].attr1, 1, ATTR1_FLIPVERT);
+
+    // test sprite to see if it wraps from btm to top
+	BIT_SET(&OAM_objs[4].attr0, 1, ATTR0_COLORMODE);
+	BIT_CLEAR(&OAM_objs[4].attr0, ATTR0_DISABLE);
+	BIT_SET(&OAM_objs[4].attr1, 2, ATTR1_OBJSIZE);
+	BIT_SET(&OAM_objs[4].attr2, 0, ATTR2_CHARNAME);
+    i32 testSpriteY = 0;
+
 
 	// Main loop
     while(1)
@@ -212,9 +348,9 @@ int main(void) {
 		player.velY += GravityPerFrame;
 		if(ButtonPressed(&inputs, KEYPAD_A))
 		{
-			player.velY = INT2FP(-4);
+			player.velY = INT2FP(-3);
 		}
-		if( (s16)player.y + FP2INT(player.velY) > 0 ) {
+		if( (i16)player.y + FP2INT(player.velY) > 0 ) {
 			player.y += FP2INT(player.velY);
 		}
 		else {
@@ -223,20 +359,55 @@ int main(void) {
 		CollideBorder(&player, &screenDim);
 
 		// update the player sprite
-		UpdateOBJPos(&OAM_objs[player.oamIdx], player.x, player.y); 
+		UpdateOBJPos(
+            &OAM_objs[player.oamIdx],
+            player.x,
+            player.y
+        ); 
 
 		// update the obstacle
 		// TODO: use fp_t for obstacle coords?
+        // TODO: create routines for initializing and deactivatingobstacles
 		obstacle.x -= 1;
-        if(obstacle.x <= 0)
+        if(obstacle.x <= -32)
         {
-            obstacle.x = 300;
+            obstacle.x = OBSTACLE_START_X;
         }
-        UpdateOBJPos(&OAM_objs[2], obstacle.x, obstacle.y);
+        // in order to get the obstacle to move off the left side,
+        // the obj must wrap back in from the right side of the map
+        i32 wrapX = obstacle.x <= 0 ? (OBJMAXX + obstacle.x) : obstacle.x;
+        for(i32 i = 0; i < MAX_TILES_LEN; i++)
+        {
+            if(obstacle.tilesTop[i].active != 0)
+            {
+                UpdateOBJPos(
+                        &OAM_objs[obstacle.tilesTop[i].oamIdx],
+                        wrapX,
+                        obstacle.tilesTop[i].y
+                        );
+            }
+            if(obstacle.tilesBottom[i].active != 0)
+            {
+                UpdateOBJPos(
+                        &OAM_objs[obstacle.tilesBottom[i].oamIdx],
+                        wrapX,
+                        obstacle.tilesBottom[i].y
+                        );
+            }
+        }
+
+        // test item to check vertical wrapping
+        testSpriteY = testSpriteY >= OBJMAXY ? 0 : testSpriteY + 1;
+        UpdateOBJPos(
+                &OAM_objs[4],
+                20,
+                testSpriteY
+                );
 	}
 
-	// disable mGBA debugging
+#ifdef __DEBUG__
 	mgba_close();
+#endif
 
     return 0;
 }
