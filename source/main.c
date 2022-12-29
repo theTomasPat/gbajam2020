@@ -258,76 +258,88 @@ int main(void) {
 
 	// create an obstacle
 #define OBSTACLE_START_X 275
+#define OBSTACLE_TILE_SIZE 32
 	Obstacle obstacle = {0};
 	obstacle.x = OBSTACLE_START_X;
 	obstacle.y = 75;
 	obstacle.gapSize = 64;
     obstacle.active = 1;
-    // TODO: create the obstacle tiles using `obstaclePool`
-    obstacle.tilesTop[0].oamIdx = 2;
-    obstacle.tilesTop[0].y = obstacle.y - (obstacle.gapSize / 2) - 32; // 32 is sprite height
-    obstacle.tilesTop[0].active = 1;
-    obstacle.tilesBottom[0].oamIdx = 3;
-    obstacle.tilesBottom[0].y = obstacle.y + (obstacle.gapSize / 2);
-    obstacle.tilesBottom[0].active = 1;
 
-
-    // TODO: create OAM objs for the top half of the obstacles;
-    //       one for the end of the obstacle at:
-    //           obstacle.y - (obstacle.gap / 2 ) - <sprite height>
-    //       calculate the number of tiling sprites for the rest
-    //       of the top-half, each at:
-    //           <sprite height = 32>
-    //           obstacle.y - (obstacle.gap / 2) - (<sprite height> * i)
-    // TODO: create OAM objs for the btm half of the obstacles;
-    //       one for the end of the obstacle at:
-    //           obstacle.y + <sprite height>
-    //       calculate the number of tiling sprites for the rest
-    //       of the btm-half, each at:
-    //           <sprite height = 32>
-    //           obstacle.y + (obstacle.gap / 2) + (<sprite height> * i)
-    //       optionally, use the same art on the bottom as the top,
-    //           but flipped vertically
-
-    // calculate the number of tiles needed on the top
+    // calculate the number of tiles needed on the top, including the end tile
     // the division will truncate the number which means that we need to add 1 to make sure
     //     there's a tile that will reach the edge of the screen
-    i32 numTilesToTopBorder = obstacle.tilesTop[0].y / 32 + 1;
+    i32 numTilesToTopBorder = (obstacle.y - (obstacle.gapSize / 2)) / 32 + 1;
 #ifdef __DEBUG__
-    snprintf(debug_msg, DEBUG_MSG_LEN, "Number top tiles: %ld\n", numTilesToTopBorder);
+    snprintf(debug_msg, DEBUG_MSG_LEN, "Number top tiles: %ld", numTilesToTopBorder);
     mgba_printf(DEBUG_DEBUG, debug_msg);
 #endif
 
-    // calculate the number of tiles needed on the btm
-    i32 numTilesToBtmBorder = (SCREEN_HEIGHT - (obstacle.y + (obstacle.gapSize / 2) + 32)) / 32 + 1;
+    // calculate the number of tiles needed on the btm, including the end tile
+    i32 numTilesToBtmBorder = (SCREEN_HEIGHT - (obstacle.y + (obstacle.gapSize / 2))) / 32 + 1;
 #ifdef __DEBUG__
-    snprintf(debug_msg, DEBUG_MSG_LEN, "Number btm tiles: %ld\n", numTilesToBtmBorder);
+    snprintf(debug_msg, DEBUG_MSG_LEN, "Number btm tiles: %ld", numTilesToBtmBorder);
     mgba_printf(DEBUG_DEBUG, debug_msg);
 #endif
 
     // TODO: setup the OAM objs for each of the obstacle tiles
 	// TODO: generalize adding sprites to avoid maintaining hardcoded values
-	// setup the obstacle sprite in OAM
-    // obstacle tile #1
-	BIT_SET(&OAM_objs[2].attr0, 1, ATTR0_COLORMODE);
-	BIT_CLEAR(&OAM_objs[2].attr0, ATTR0_DISABLE);
-	BIT_SET(&OAM_objs[2].attr1, 2, ATTR1_OBJSIZE);
-	// TODO: the starting tile is #16 in the tile set but the char name for
-	// this sprite needs to be 32... why? what is a "char name" (attr2)?
-	BIT_SET(&OAM_objs[2].attr2, 32, ATTR2_CHARNAME);
-    // obstacle tile #2
-	BIT_SET(&OAM_objs[3].attr0, 1, ATTR0_COLORMODE);
-	BIT_CLEAR(&OAM_objs[3].attr0, ATTR0_DISABLE);
-	BIT_SET(&OAM_objs[3].attr1, 2, ATTR1_OBJSIZE);
-	BIT_SET(&OAM_objs[3].attr2, 32, ATTR2_CHARNAME);
-	BIT_SET(&OAM_objs[3].attr1, 1, ATTR1_FLIPVERT);
+    
+    i32 objPoolIdx;
 
-    // test sprite to see if it wraps from btm to top
-	BIT_SET(&OAM_objs[4].attr0, 1, ATTR0_COLORMODE);
-	BIT_CLEAR(&OAM_objs[4].attr0, ATTR0_DISABLE);
-	BIT_SET(&OAM_objs[4].attr1, 2, ATTR1_OBJSIZE);
-	BIT_SET(&OAM_objs[4].attr2, 0, ATTR2_CHARNAME);
-    i32 testSpriteY = 0;
+    // tiles for top
+    for(size_t i = 0; i < numTilesToTopBorder; i++)
+    {
+        // setup the obstacle tile struct
+        objPoolIdx = OBJPool_GetNextIdx(&obstaclePool);
+        obstacle.tilesTop[i].oamIdx = objPoolIdx;
+        obstacle.tilesTop[i].active = 1;
+        obstacle.tilesTop[i].y = obstacle.y - (obstacle.gapSize / 2) - (OBSTACLE_TILE_SIZE * (i + 1));
+        if(obstacle.tilesTop[i].y < 0)
+        {
+            // wrap the tile vertically if it goes out of bounds
+            obstacle.tilesTop[i].y += OBJMAXY + 1;
+        }
+
+        // setup the obstacle sprite in OAM
+        BIT_SET(&OAM_objs[objPoolIdx].attr0, 1, ATTR0_COLORMODE);
+        BIT_CLEAR(&OAM_objs[objPoolIdx].attr0, ATTR0_DISABLE);
+        BIT_SET(&OAM_objs[objPoolIdx].attr1, 2, ATTR1_OBJSIZE);
+        if(i == 0)
+        {
+            // the first tile should be an end-piece
+            // TODO: the starting tile is #16 in the tile set but the char name for
+            // this sprite needs to be 32... why? what is a "char name" (attr2)?
+            BIT_SET(&OAM_objs[objPoolIdx].attr2, 32, ATTR2_CHARNAME);
+        }
+        else
+        {
+            // every other tile but the first should use a tiling sprite
+            BIT_SET(&OAM_objs[objPoolIdx].attr2, 64, ATTR2_CHARNAME);
+        }
+    }
+
+    // tiles for btm
+    for(size_t i = 0; i < numTilesToBtmBorder; i++)
+    {
+        objPoolIdx = OBJPool_GetNextIdx(&obstaclePool);
+        obstacle.tilesBottom[i].oamIdx = objPoolIdx;
+        obstacle.tilesBottom[i].active = 1;
+        obstacle.tilesBottom[i].y = obstacle.y + (obstacle.gapSize / 2) + (OBSTACLE_TILE_SIZE * i);
+        BIT_SET(&OAM_objs[objPoolIdx].attr0, 1, ATTR0_COLORMODE);
+        BIT_CLEAR(&OAM_objs[objPoolIdx].attr0, ATTR0_DISABLE);
+        BIT_SET(&OAM_objs[objPoolIdx].attr1, 2, ATTR1_OBJSIZE);
+        BIT_SET(&OAM_objs[objPoolIdx].attr1, 1, ATTR1_FLIPVERT);
+        if(i == 0)
+        {
+            // the first tile is the end-piece
+            BIT_SET(&OAM_objs[objPoolIdx].attr2, 32, ATTR2_CHARNAME);
+        }
+        else
+        {
+            // all other tiles but the first should use tiling sprites
+            BIT_SET(&OAM_objs[objPoolIdx].attr2, 64, ATTR2_CHARNAME);
+        }
+    }
 
 
 	// Main loop
@@ -367,7 +379,7 @@ int main(void) {
 
 		// update the obstacle
 		// TODO: use fp_t for obstacle coords?
-        // TODO: create routines for initializing and deactivatingobstacles
+        // TODO: create routines for initializing and deactivating obstacles
 		obstacle.x -= 1;
         if(obstacle.x <= -32)
         {
@@ -395,14 +407,6 @@ int main(void) {
                         );
             }
         }
-
-        // test item to check vertical wrapping
-        testSpriteY = testSpriteY >= OBJMAXY ? 0 : testSpriteY + 1;
-        UpdateOBJPos(
-                &OAM_objs[4],
-                20,
-                testSpriteY
-                );
 	}
 
 #ifdef __DEBUG__
