@@ -2,7 +2,7 @@
 #define __BIT_CONTROL__
 
 
-#define BIT_SET(addr, val, shift) ( *(addr) |= (val << shift) )
+#define BIT_SET(addr, shift) ( *(addr) |= (1 << shift) )
 #define BIT_CLEAR(addr, shift) ( *addr &= ~(1 << shift) )
 #define BIT_CHECK(addr, mask, shift) ( (*(addr) &= (mask)) >> (shift) )
 
