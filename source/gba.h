@@ -119,6 +119,7 @@ typedef struct {
 #define ATTR1_FLIPHOR 12
 #define ATTR1_FLIPVERT 13
 #define ATTR1_OBJSIZE 14
+#define ATTR1_OBJSIZE_LEN 2
 
 #define ATTR1_XCOORD_SHIFT 0
 #define ATTR1_XCOORD_MASK 0xFF
