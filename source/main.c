@@ -497,6 +497,7 @@ int main(void)
 		if(ButtonPressed(&inputs, KEYPAD_A))
 		{
 			player.velY = INT2FP(-3);
+            xorshift32(&randState); // seed the RNG on button press
 		}
         player.y += FP2INT(player.velY);
 		PlayerCollideBorder(&player, &screenDim);
