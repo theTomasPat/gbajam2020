@@ -3,6 +3,12 @@
 
 #include <stdint.h>
 
+#ifdef __DEBUG__
+#define ASSERT(expr) if(!(expr)) { *(uint8_t*)0x4000301 = 1; }
+#else
+#define ASSERT(expr)
+#endif
+
 typedef  uint8_t  u8;
 typedef   int8_t  i8;
 typedef uint16_t u16;
@@ -23,6 +29,7 @@ typedef  int32_t i32;
 #define BGPAL_MEM  ((uint16_t *)0x05000000)
 #define OBJPAL_MEM ((uint16_t *)0x05000200)
 
+void OAM_Init(void);
 
 // Display Control
 #define REG_DISPCNT ((uint16_t *)0x04000000)

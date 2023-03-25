@@ -1,4 +1,5 @@
 #include "gba.h"
+#include "bit_control.h"
 
 void Vsync() {
 	while(*VCOUNT_MEM >= 160);  // wait until VDraw
@@ -33,4 +34,20 @@ u16 ButtonDown(InputState *inputs, u16 button) {
 void UpdateButtonStates(InputState *inputs) {
 	inputs->prev = inputs->curr;
 	inputs->curr = *KEYINPUT;
+}
+
+
+// Go through all 128 OAM entries and for each of them,
+// zero them out and disable them. This prevents a mess of
+// sprites from appearing at 0,0 on initialization
+void OAM_Init() {
+	OBJ_ATTR *obj = (OBJ_ATTR *)OAM_MEM;
+
+	for(int i = 0; i < 128; i++)
+	{
+		*obj = (OBJ_ATTR){0};
+		BIT_SET(&obj->attr0, ATTR0_DISABLE);
+
+		obj++;
+	}
 }

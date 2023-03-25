@@ -16,7 +16,7 @@ typedef u32 fpu_t;
 #define FP_FRACBITS 16
 
 #define FP2INT(x) ((x) >> (FP_FRACBITS))
-#define INT2FP(x) ((x) << (FP_FRACBITS))
+#define INT2FP(x) ((x) << (FP_FRACBITS)) // TODO: how to do this properly?
 #define FP(x, y)  ((INT2FP(x)) | (y))
 
 // TODO: finish implementing FP arithmetic.
