@@ -2,6 +2,7 @@
 
 #include "game_states.h"
 #include "bit_control.h"
+#include "fixed.h"
 
 #include "256Palette.h"
 #include "Robo.h"
@@ -18,6 +19,8 @@
 #include "Numbers_7.h"
 #include "Numbers_8.h"
 #include "Numbers_9.h"
+#include "ButtonA_dark.h"
+#include "ButtonA_light.h"
 
 i32
 WrapY(i32 y)
@@ -106,6 +109,7 @@ ObstacleCreate(
     //     there's a tile that will reach the edge of the screen
     i32 numTilesToTopBorder = (Result.y - (Result.gapSize / 2)) / 32 + 1;
     i32 numTilesToBtmBorder = (SCREEN_HEIGHT - ((i32)Result.y + ((i32)Result.gapSize / 2))) / 32 + 1;
+
 #ifdef __DEBUG__
     char debug_msg[DEBUG_MSG_LEN];
 	mgba_printf(DEBUG_DEBUG, "Creating a new obstacle...");
@@ -243,14 +247,10 @@ gameState_GameInit(GameScreenState *state)
 	BF_SET(BG0CNT, bgMapBaseBlock, 5, BGXCNT_SCRNBASEBLOCK); // select bg map base block
 	BF_SET(BG0CNT, 2, 2, BGXCNT_SCREENSIZE); // select map size (64x32 tiles, or 2x 32x32-tile screens, side-by-side)
 
-	// TODO: define a struct that will hold all the state for the game
-	// and that can be passed to each of the state machine functions
-	// so they have stuff to work with
-
     // setup important scene items
 	state->inputs = (InputState){0};
 	state->screenDim = (ScreenDim){ 0, 0, 240, 160 };
-    state->player = Player_Create(4, 60, 80, Rectangle_Create(8, 7, 21, 16), 0, 0);
+    state->player = Player_Create(4, 60, 80, Rectangle_Create(8, 9, 21, 14), 0, 0);
     state->obstaclePool = OBJPool_Create(104, 24); // 6 tiles per obstacle, 4 obstacles in use at a time
 	state->frameCounter = 1;
     state->score = 0;
@@ -283,6 +283,8 @@ gameState_GameInit(GameScreenState *state)
 	memcpy(&tile8_mem[4][92], Numbers_7Tiles, Numbers_7TilesLen);
 	memcpy(&tile8_mem[4][96], Numbers_8Tiles, Numbers_8TilesLen);
 	memcpy(&tile8_mem[4][100], Numbers_9Tiles, Numbers_9TilesLen);
+	memcpy(&tile8_mem[4][104], ButtonA_lightTiles, ButtonA_lightTilesLen);
+	memcpy(&tile8_mem[4][120], ButtonA_darkTiles, ButtonA_darkTilesLen);
 
     // initialize OAM items
 	OBJ_ATTR *OAM_objs;
@@ -306,10 +308,19 @@ gameState_GameInit(GameScreenState *state)
 
 	// setup the robot's sprite
 	BIT_SET(&OAM_objs[state->player.oamIdx].attr0, ATTR0_COLORMODE);
+	BF_SET(&OAM_objs[state->player.oamIdx].attr1, state->player.x, ATTR1_XCOORD_LEN, ATTR1_XCOORD_SHIFT);
+	BF_SET(&OAM_objs[state->player.oamIdx].attr0, state->player.y, ATTR0_YCOORD_LEN, ATTR0_YCOORD_SHIFT);
 	BIT_CLEAR(&OAM_objs[state->player.oamIdx].attr0, ATTR0_DISABLE);
 	BF_SET(&OAM_objs[state->player.oamIdx].attr1, 2, 2, ATTR1_OBJSIZE);
 	BF_SET(&OAM_objs[state->player.oamIdx].attr2, 0, ATTR2_CHARNAME_LEN, ATTR2_CHARNAME_SHIFT);
 
+	// setup the title screen button
+	BIT_SET(&OAM_objs[5].attr0, ATTR0_COLORMODE);
+	BF_SET(&OAM_objs[5].attr1, 160, ATTR1_XCOORD_LEN, ATTR1_XCOORD_SHIFT);
+	BF_SET(&OAM_objs[5].attr0, 65, ATTR0_YCOORD_LEN, ATTR0_YCOORD_SHIFT);
+	BIT_CLEAR(&OAM_objs[5].attr0, ATTR0_DISABLE);
+	BF_SET(&OAM_objs[5].attr1, 2, 2, ATTR1_OBJSIZE);
+	BF_SET(&OAM_objs[5].attr2, 208, ATTR2_CHARNAME_LEN, ATTR2_CHARNAME_SHIFT);
 
 #ifdef __DEBUG__
     // test the OBJPool system by making sure the index numbers
@@ -383,13 +394,50 @@ gameState_GameInit(GameScreenState *state)
     state->obstacles[state->obstacleIdx] = ObstacleCreate(OAM_objs, &state->obstaclePool, &state->randState);
 	state->obstacleIdx++;
 
-	return GAMESTATE_GAMESCREEN;
+	return GAMESTATE_TITLESCREEN;
 }
 
 GameStates
 gameState_TitleScreen(GameScreenState *state)
 {
-	return GAMESTATE_COUNT;
+    Vsync();
+    UpdateButtonStates(&state->inputs);
+
+	// scroll BG. since the BGxHOFS register is write-only,
+	// the offset needs to be stored in the game state
+    state->bgHOffset += state->bgHOffsetRate;
+    if(state->bgHOffset > FP(511,0)) { state->bgHOffset -= FP(511,0); }
+    *BG0HOFS = FP2Int(state->bgHOffset);
+
+	OBJ_ATTR *OAM_objs;
+	OAM_objs = (OBJ_ATTR *)OAM_MEM;
+
+	BF_SET(&OAM_objs[5].attr2, 208, ATTR2_CHARNAME_LEN, ATTR2_CHARNAME_SHIFT);
+
+    // move player
+    state->player.velY += state->GravityPerFrame;
+    if(state->player.y > 85)
+    {
+        state->player.velY = Int2FP(-3);
+        xorshift32(&state->randState); // seed the RNG on button press
+		BF_SET(&OAM_objs[5].attr2, 240, ATTR2_CHARNAME_LEN, ATTR2_CHARNAME_SHIFT);
+    }
+    state->player.y += FP2Int(state->player.velY);
+	
+    // update the player sprite
+    UpdateOBJPos(
+        &OAM_objs[state->player.oamIdx],
+        state->player.x,
+        WrapY(state->player.y)
+        ); 
+
+	if(ButtonPressed(&state->inputs, KEYPAD_A))
+	{
+		BIT_SET(&OAM_objs[5].attr0, ATTR0_DISABLE);
+		return GAMESTATE_GAMESCREEN;
+	}
+
+	return GAMESTATE_TITLESCREEN;
 }
 
 GameStates
@@ -409,16 +457,16 @@ gameState_GameScreen(GameScreenState *state)
     // the register
     state->bgHOffset += state->bgHOffsetRate;
     if(state->bgHOffset > FP(511,0)) { state->bgHOffset -= FP(511,0); }
-    *BG0HOFS = FP2INT(state->bgHOffset);
+    *BG0HOFS = FP2Int(state->bgHOffset);
 
     // move player
     state->player.velY += state->GravityPerFrame;
     if(ButtonPressed(&state->inputs, KEYPAD_A))
     {
-        state->player.velY = INT2FP(-3);
+        state->player.velY = Int2FP(-3);
         xorshift32(&state->randState); // seed the RNG on button press
     }
-    state->player.y += FP2INT(state->player.velY);
+    state->player.y += FP2Int(state->player.velY);
     PlayerCollideBorder(&state->player, &state->screenDim);
 
     // update the player sprite
