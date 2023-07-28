@@ -23,6 +23,8 @@
 #include "ButtonA_dark.h"
 #include "ButtonA_light.h"
 
+#include "sprites.h"
+
 i32
 WrapY(i32 y)
 {
@@ -290,6 +292,9 @@ gameState_GameInit(GameScreenState *state)
 	memcpy(&tile8_mem[4][100], Numbers_9Tiles, Numbers_9TilesLen);
 	memcpy(&tile8_mem[4][104], ButtonA_lightTiles, ButtonA_lightTilesLen);
 	memcpy(&tile8_mem[4][120], ButtonA_darkTiles, ButtonA_darkTilesLen);
+
+    // TODO: update the rest of the code to make use of the compiled sprites
+	//memcpy(&tile8_mem[4][0], CharTiles, CHARTILES_LEN);
 
     // initialize OAM items
 	OBJ_ATTR *OAM_objs;
