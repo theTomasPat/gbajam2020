@@ -1,5 +1,6 @@
 #include <string.h>
 
+#include "gba.h"
 #include "game_states.h"
 #include "bit_control.h"
 #include "fixed.h"
@@ -57,11 +58,11 @@ u16 PlayerCollideBorder(Player *player, ScreenDim *screenDim)
 	}
 
 	// check bottom
-	if( player->y + player->bounding_box.y + player->bounding_box.h > screenDim->h ) {
-		player->y = screenDim->h - player->bounding_box.h - player->bounding_box.y;
-		player->velY = 0;
-		outOfBounds = 1;
-	}
+	//if( player->y + player->bounding_box.y + player->bounding_box.h > screenDim->h ) {
+	//	player->y = screenDim->h - player->bounding_box.h - player->bounding_box.y;
+	//	player->velY = 0;
+	//	outOfBounds = 1;
+	//}
 
 	if( outOfBounds > 0 )
 		return 1;
@@ -71,16 +72,17 @@ u16 PlayerCollideBorder(Player *player, ScreenDim *screenDim)
 Player
 Player_Create(u32 oamIdx, u32 x, u32 y, Rectangle bounding_box, fp_t velX, fp_t velY)
 {
-    Player Return = {0};
+    Player player = {0};
 
-    Return.oamIdx = oamIdx;
-    Return.x = x;
-    Return.y = y;
-    Return.bounding_box = bounding_box;
-    Return.velX = velX;
-    Return.velY = velY;
+    player.oamIdx = oamIdx;
+    player.x = x;
+    player.y = y;
+    player.bounding_box = bounding_box;
+    player.velX = velX;
+    player.velY = velY;
+    player.anim = Animation_Create((u32[]){0, 0}, 2, 15, TRUE); //frame #s refer to attr2 charname
 
-    return Return;
+    return player;
 }
 
 void UpdateOBJPos(OBJ_ATTR *obj, int x, int y)
@@ -255,6 +257,9 @@ gameState_GameInit(GameScreenState *state)
 	state->frameCounter = 1;
     state->score = 0;
     state->GravityPerFrame = FP(0, 0x4000);
+    state->aButtonAnimation = Animation_Create((u32[]){240, 208}, 2, 10, FALSE);
+
+    Animation_Play(state->player.anim);
 
 	// setup the random number generator
     state->randState = (xorshift32_state){69420};
@@ -312,7 +317,7 @@ gameState_GameInit(GameScreenState *state)
 	BF_SET(&OAM_objs[state->player.oamIdx].attr0, state->player.y, ATTR0_YCOORD_LEN, ATTR0_YCOORD_SHIFT);
 	BIT_CLEAR(&OAM_objs[state->player.oamIdx].attr0, ATTR0_DISABLE);
 	BF_SET(&OAM_objs[state->player.oamIdx].attr1, 2, 2, ATTR1_OBJSIZE);
-	BF_SET(&OAM_objs[state->player.oamIdx].attr2, 0, ATTR2_CHARNAME_LEN, ATTR2_CHARNAME_SHIFT);
+	BF_SET(&OAM_objs[state->player.oamIdx].attr2, state->player.anim->curFrame, ATTR2_CHARNAME_LEN, ATTR2_CHARNAME_SHIFT);
 
 	// setup the title screen button
 	BIT_SET(&OAM_objs[5].attr0, ATTR0_COLORMODE);
@@ -420,11 +425,22 @@ gameState_TitleScreen(GameScreenState *state)
     {
         state->player.velY = Int2FP(-3);
         xorshift32(&state->randState); // seed the RNG on button press
-		BF_SET(&OAM_objs[5].attr2, 240, ATTR2_CHARNAME_LEN, ATTR2_CHARNAME_SHIFT);
+        Animation_Restart(state->aButtonAnimation);
     }
     state->player.y += FP2Int(state->player.velY);
+    Animation_Update(state->player.anim, 1);
+
+    // udpate the A Button sprite
+    Animation_Update(state->aButtonAnimation, 1);
+    BF_SET(&OAM_objs[5].attr2, state->aButtonAnimation->frames[state->aButtonAnimation->curFrame], ATTR2_CHARNAME_LEN, ATTR2_CHARNAME_SHIFT);
 	
     // update the player sprite
+    BF_SET(
+        &OAM_objs[state->player.oamIdx].attr2,
+        state->player.anim->frames[state->player.anim->curFrame],
+        ATTR2_CHARNAME_LEN,
+        ATTR2_CHARNAME_SHIFT
+        );
     UpdateOBJPos(
         &OAM_objs[state->player.oamIdx],
         state->player.x,
@@ -476,6 +492,13 @@ gameState_GameScreen(GameScreenState *state)
         WrapY(state->player.y)
         ); 
 
+    // check if the player has gone off the btm of the screen
+    if(state->player.y + state->player.bounding_box.y > state->screenDim.h)
+    {
+        //game over
+        return GAMESTATE_GAMEOVER;
+    }
+
     // update the obstacles
     for(size_t i = 0; i < OBSTACLES_MAX; i++)
     {
@@ -485,8 +508,8 @@ gameState_GameScreen(GameScreenState *state)
 
         // add to the score if the obstacle has moved past the player
         if(
-                (state->obstacles[i].x + state->obstacles[i].bounding_box_top.w < state->player.x) &&
-                state->obstacles[i].countedScore == 0)
+            (state->obstacles[i].x + state->obstacles[i].bounding_box_top.w < state->player.x) &&
+            state->obstacles[i].countedScore == 0)
         {
             if(state->score < 9999) ++state->score;
             state->obstacles[i].countedScore = 1;
@@ -560,7 +583,6 @@ gameState_GameScreen(GameScreenState *state)
                     CheckCollision_RectRect(playerRect, obstacleRectBtm)
               )
             {
-                // TODO: game over!
 #ifdef __DEBUG__
                 mgba_printf(DEBUG_DEBUG, "GAME OVER");
 #endif
@@ -590,6 +612,8 @@ gameState_GameScreen(GameScreenState *state)
 GameStates
 gameState_GameOver(GameScreenState *state)
 {
+    // TODO: check/save the highscore
+
 	return GAMESTATE_GAMESCREENDEINIT;
 }
 

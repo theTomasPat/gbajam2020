@@ -9,6 +9,7 @@
 #include "obj_pool.h"
 #include "random.h"
 #include "bit_control.h"
+#include "animation.h"
 
 #define ARR_LENGTH(arr) (sizeof(arr) / sizeof(arr[0]))
 
@@ -31,6 +32,7 @@ typedef struct Player {
     Rectangle bounding_box;
 	fp_t velX;
 	fp_t velY;
+    Animation *anim;
 } __attribute__((aligned (4))) Player;
 
 u16 PlayerCollideBorder(Player *player, ScreenDim *screenDim);
@@ -84,6 +86,7 @@ typedef struct {
     fp_t GravityPerFrame;
     xorshift32_state randState;
     Obstacle obstacles[OBSTACLES_MAX];
+    Animation *aButtonAnimation;
 } GameScreenState;
 
 typedef enum {
