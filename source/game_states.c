@@ -116,7 +116,7 @@ ObstacleCreate(
     Obstacle Result = {0};
 
 	Result.x = OBSTACLE_START_X;
-    Result.gapSize = xorshift32_range(randState, 40, 96);
+    Result.gapSize = xorshift32_range(randState, 50, 96);
 	Result.y = xorshift32_range(randState, Result.gapSize / 2 + 16, 160 - (Result.gapSize / 2) - 16);
     Result.active = 1;
 
