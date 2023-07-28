@@ -1,3 +1,4 @@
+# TODO: include building the sprites
 
 PATH := $(DEVKITARM)/bin:$(PATH)
 
@@ -21,7 +22,7 @@ OBJCOPY := $(PREFIX)objcopy
 ARCH := -mthumb-interwork -mthumb
 SPECS := -specs=gba.specs
 
-DEBUG_FLAGS := -g -O0 -D __DEBUG__
+DEBUG_FLAGS := -g -O0 -D __DEBUG__ -Wvla
 CFLAGS := $(ARCH) -std=c99 -Wall -O3 -fno-strict-aliasing -IC:/devkitPro/devkitARM/arm-none-eabi/include -I./source
 LDFLAGS := $(ARCH) $(SPECS)
 
