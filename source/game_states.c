@@ -82,7 +82,19 @@ Player_Create(u32 oamIdx, u32 x, u32 y, Rectangle bounding_box, fp_t velX, fp_t 
     player.bounding_box = bounding_box;
     player.velX = velX;
     player.velY = velY;
-    player.anim = Animation_Create((u32[]){0, 0}, 2, 15, TRUE); //frame #s refer to attr2 charname
+    player.anim = Animation_Create(
+            (u32[]){
+                SPRITE_Robo_1_CHARNAME,
+                SPRITE_Robo_2_CHARNAME,
+                SPRITE_Robo_2_CHARNAME,
+                SPRITE_Robo_3_CHARNAME,
+                SPRITE_Robo_3_CHARNAME,
+                SPRITE_Robo_4_CHARNAME,
+                SPRITE_Robo_4_CHARNAME,
+                SPRITE_Robo_5_CHARNAME
+            }, //frame #s refer to attr2 charname
+            8, 30, FALSE
+    );
 
     return player;
 }
@@ -160,12 +172,22 @@ ObstacleCreate(
         {
             // TODO: the starting tile is #16 in the tile set but the char name for
             // this sprite needs to be 32... why? what is a "char name" (attr2)?
-            BF_SET(&OAM_objs[obstaclePool->indexes[objPoolIdx]].attr2, 32, ATTR2_CHARNAME_LEN, ATTR2_CHARNAME_SHIFT);
+            BF_SET(
+                &OAM_objs[obstaclePool->indexes[objPoolIdx]].attr2,
+                SPRITE_Obstacle_End_CHARNAME,
+                ATTR2_CHARNAME_LEN,
+                ATTR2_CHARNAME_SHIFT
+            );
         }
         else
         {
             // every other tile but the first should use a tiling sprite
-            BF_SET(&OAM_objs[obstaclePool->indexes[objPoolIdx]].attr2, 64, ATTR2_CHARNAME_LEN, ATTR2_CHARNAME_SHIFT);
+            BF_SET(
+                &OAM_objs[obstaclePool->indexes[objPoolIdx]].attr2,
+                SPRITE_Obstacle_Tile_01_CHARNAME,
+                ATTR2_CHARNAME_LEN,
+                ATTR2_CHARNAME_SHIFT
+            );
         }
         BIT_CLEAR(&OAM_objs[obstaclePool->indexes[objPoolIdx]].attr0, ATTR0_DISABLE);
     }
@@ -259,7 +281,13 @@ gameState_GameInit(GameScreenState *state)
 	state->frameCounter = 1;
     state->score = 0;
     state->GravityPerFrame = FP(0, 0x4000);
-    state->aButtonAnimation = Animation_Create((u32[]){240, 208}, 2, 10, FALSE);
+    state->aButtonAnimation = Animation_Create(
+        (u32[]){
+            SPRITE_ButtonA_dark_CHARNAME,
+            SPRITE_ButtonA_light_CHARNAME
+        },
+        2, 8, FALSE
+    );
 
     Animation_Play(state->player.anim);
 
@@ -271,30 +299,10 @@ gameState_GameInit(GameScreenState *state)
 	memcpy(OBJPAL_MEM, Pal256, PalLen256);
 
     // copy all sprite data into VRAM
+    // compiled using tile-builder, extra metadata in `sprites.h`
 	// TODO: see about timing the memcpy
 	// 		 look into using DMA transfers for potential speedup
-    // TODO: there's gotta be a better way to transfer all these tiles...
-    //       it might also be nice to keep track of the tiles' index to
-    //       keep track of them later
-	memcpy(&tile8_mem[4][0], RoboTiles, RoboTilesLen);
-	memcpy(&tile8_mem[4][16], Obstacle_EndTiles, Obstacle_EndTilesLen);
-	memcpy(&tile8_mem[4][32], Obstacle_Tile_01Tiles, Obstacle_Tile_01TilesLen);
-	memcpy(&tile8_mem[4][48], Obstacle_Tile_02Tiles, Obstacle_Tile_02TilesLen);
-	memcpy(&tile8_mem[4][64], Numbers_0Tiles, Numbers_0TilesLen);
-	memcpy(&tile8_mem[4][68], Numbers_1Tiles, Numbers_1TilesLen);
-	memcpy(&tile8_mem[4][72], Numbers_2Tiles, Numbers_2TilesLen);
-	memcpy(&tile8_mem[4][76], Numbers_3Tiles, Numbers_3TilesLen);
-	memcpy(&tile8_mem[4][80], Numbers_4Tiles, Numbers_4TilesLen);
-	memcpy(&tile8_mem[4][84], Numbers_5Tiles, Numbers_5TilesLen);
-	memcpy(&tile8_mem[4][88], Numbers_6Tiles, Numbers_6TilesLen);
-	memcpy(&tile8_mem[4][92], Numbers_7Tiles, Numbers_7TilesLen);
-	memcpy(&tile8_mem[4][96], Numbers_8Tiles, Numbers_8TilesLen);
-	memcpy(&tile8_mem[4][100], Numbers_9Tiles, Numbers_9TilesLen);
-	memcpy(&tile8_mem[4][104], ButtonA_lightTiles, ButtonA_lightTilesLen);
-	memcpy(&tile8_mem[4][120], ButtonA_darkTiles, ButtonA_darkTilesLen);
-
-    // TODO: update the rest of the code to make use of the compiled sprites
-	//memcpy(&tile8_mem[4][0], CharTiles, CHARTILES_LEN);
+	memcpy(&tile8_mem[4][0], SpriteTiles, SPRITETILES_LEN);
 
     // initialize OAM items
 	OBJ_ATTR *OAM_objs;
@@ -309,8 +317,8 @@ gameState_GameInit(GameScreenState *state)
     for(u32 i = 0; i < ARR_LENGTH(state->scoreCounterOAMIdxs); i++)
     {
         BIT_SET(&OAM_objs[state->scoreCounterOAMIdxs[i]].attr0, ATTR0_COLORMODE);
-        BF_SET(&OAM_objs[state->scoreCounterOAMIdxs[i]].attr1, 1, ATTR1_OBJSIZE_LEN, ATTR1_OBJSIZE);
-        BF_SET(&OAM_objs[state->scoreCounterOAMIdxs[i]].attr2, 128, ATTR2_CHARNAME_LEN, ATTR2_CHARNAME_SHIFT);
+        BF_SET(&OAM_objs[state->scoreCounterOAMIdxs[i]].attr1, SPRITE_Numbers_0_OBJSIZE, ATTR1_OBJSIZE_LEN, ATTR1_OBJSIZE);
+        BF_SET(&OAM_objs[state->scoreCounterOAMIdxs[i]].attr2, SPRITE_Numbers_0_CHARNAME, ATTR2_CHARNAME_LEN, ATTR2_CHARNAME_SHIFT);
         BF_SET(&OAM_objs[state->scoreCounterOAMIdxs[i]].attr1, 5 + i * 16, ATTR1_XCOORD_LEN, ATTR1_XCOORD_SHIFT);
         BF_SET(&OAM_objs[state->scoreCounterOAMIdxs[i]].attr0, 5, ATTR0_YCOORD_LEN, ATTR0_YCOORD_SHIFT);
         BIT_CLEAR(&OAM_objs[state->scoreCounterOAMIdxs[i]].attr0, ATTR0_DISABLE);
@@ -321,33 +329,36 @@ gameState_GameInit(GameScreenState *state)
 	BF_SET(&OAM_objs[state->player.oamIdx].attr1, state->player.x, ATTR1_XCOORD_LEN, ATTR1_XCOORD_SHIFT);
 	BF_SET(&OAM_objs[state->player.oamIdx].attr0, state->player.y, ATTR0_YCOORD_LEN, ATTR0_YCOORD_SHIFT);
 	BIT_CLEAR(&OAM_objs[state->player.oamIdx].attr0, ATTR0_DISABLE);
-	BF_SET(&OAM_objs[state->player.oamIdx].attr1, 2, 2, ATTR1_OBJSIZE);
+	BF_SET(&OAM_objs[state->player.oamIdx].attr1, SPRITE_Robo_1_OBJSIZE, 2, ATTR1_OBJSIZE);
 	BF_SET(&OAM_objs[state->player.oamIdx].attr2, state->player.anim->curFrame, ATTR2_CHARNAME_LEN, ATTR2_CHARNAME_SHIFT);
 
 	// setup the title screen button
+    // TODO: make it easier to identify which OAM OBJ to modify (instead of using numbers)
 	BIT_SET(&OAM_objs[5].attr0, ATTR0_COLORMODE);
 	BF_SET(&OAM_objs[5].attr1, 160, ATTR1_XCOORD_LEN, ATTR1_XCOORD_SHIFT);
 	BF_SET(&OAM_objs[5].attr0, 65, ATTR0_YCOORD_LEN, ATTR0_YCOORD_SHIFT);
 	BIT_CLEAR(&OAM_objs[5].attr0, ATTR0_DISABLE);
-	BF_SET(&OAM_objs[5].attr1, 2, 2, ATTR1_OBJSIZE);
-	BF_SET(&OAM_objs[5].attr2, 208, ATTR2_CHARNAME_LEN, ATTR2_CHARNAME_SHIFT);
+	BF_SET(&OAM_objs[5].attr1, SPRITE_ButtonA_light_OBJSIZE, 2, ATTR1_OBJSIZE);
+	BF_SET(&OAM_objs[5].attr2, SPRITE_ButtonA_light_CHARNAME, ATTR2_CHARNAME_LEN, ATTR2_CHARNAME_SHIFT);
 
-#ifdef __DEBUG__
+#if __DEBUG__
     // test the OBJPool system by making sure the index numbers
     // wrap properly within the pool and also by filling the
     // OAM objs using the pool
-    for(size_t i = 0; i < 32; i++)
-    {
-        i32 poolIdx = OBJPool_GetNextIdx(&state->obstaclePool);
-        i32 objIdx = state->obstaclePool.indexes[poolIdx];
-        snprintf(debug_msg, DEBUG_MSG_LEN,
-                "obstaclePool[%ld]: %ld",
-                poolIdx, objIdx);
-        mgba_printf(DEBUG_DEBUG, debug_msg);
-        BIT_SET(&OAM_objs[objIdx].attr0, ATTR0_COLORMODE);
-        BF_SET(&OAM_objs[objIdx].attr1, 2, 2, ATTR1_OBJSIZE);
-        BF_SET(&OAM_objs[objIdx].attr2, 0, ATTR2_CHARNAME_LEN, ATTR2_CHARNAME_SHIFT);
-    }
+    //for(size_t i = 0; i < 32; i++)
+    //{
+    //    i32 poolIdx = OBJPool_GetNextIdx(&state->obstaclePool);
+    //    i32 objIdx = state->obstaclePool.indexes[poolIdx];
+    //    snprintf(debug_msg, DEBUG_MSG_LEN,
+    //            "obstaclePool[%ld]: %ld",
+    //            poolIdx, objIdx);
+    //    mgba_printf(DEBUG_DEBUG, debug_msg);
+    //    BIT_SET(&OAM_objs[objIdx].attr0, ATTR0_COLORMODE);
+    //    BF_SET(&OAM_objs[objIdx].attr1, 2, 2, ATTR1_OBJSIZE);
+    //    BF_SET(&OAM_objs[objIdx].attr2, 0, ATTR2_CHARNAME_LEN, ATTR2_CHARNAME_SHIFT);
+    //}
+    debug_msg[0] = '\0';
+    debug_msg[0] = debug_msg[0]; // shut up unused var warning
 #endif
 
 	// dummy BG tile art
@@ -419,10 +430,10 @@ gameState_TitleScreen(GameScreenState *state)
     if(state->bgHOffset > FP(511,0)) { state->bgHOffset -= FP(511,0); }
     *BG0HOFS = FP2Int(state->bgHOffset);
 
-	OBJ_ATTR *OAM_objs;
-	OAM_objs = (OBJ_ATTR *)OAM_MEM;
+	OBJ_ATTR *OAM_objs = (OBJ_ATTR *)OAM_MEM;
 
-	BF_SET(&OAM_objs[5].attr2, 208, ATTR2_CHARNAME_LEN, ATTR2_CHARNAME_SHIFT);
+    // ButtonA_light
+	//BF_SET(&OAM_objs[5].attr2, SPRITE_ButtonA_light_CHARNAME, ATTR2_CHARNAME_LEN, ATTR2_CHARNAME_SHIFT);
 
     // move player
     state->player.velY += state->GravityPerFrame;
@@ -431,6 +442,7 @@ gameState_TitleScreen(GameScreenState *state)
         state->player.velY = Int2FP(-3);
         xorshift32(&state->randState); // seed the RNG on button press
         Animation_Restart(state->aButtonAnimation);
+        Animation_Restart(state->player.anim);
     }
     state->player.y += FP2Int(state->player.velY);
     Animation_Update(state->player.anim, 1);
@@ -469,8 +481,7 @@ gameState_GameScreen(GameScreenState *state)
     Vsync();
     UpdateButtonStates(&state->inputs);
 
-	OBJ_ATTR *OAM_objs;
-	OAM_objs = (OBJ_ATTR *)OAM_MEM;
+	OBJ_ATTR *OAM_objs = (OBJ_ATTR *)OAM_MEM;
 
     // scroll the BG
     // BG0HOFS is write-only so we need an extra variable (bgHOffset)
@@ -486,11 +497,19 @@ gameState_GameScreen(GameScreenState *state)
     {
         state->player.velY = Int2FP(-3);
         xorshift32(&state->randState); // seed the RNG on button press
+        Animation_Restart(state->player.anim);
     }
     state->player.y += FP2Int(state->player.velY);
+    Animation_Update(state->player.anim, 1);
     PlayerCollideBorder(&state->player, &state->screenDim);
 
     // update the player sprite
+    BF_SET(
+        &OAM_objs[state->player.oamIdx].attr2,
+        state->player.anim->frames[state->player.anim->curFrame],
+        ATTR2_CHARNAME_LEN,
+        ATTR2_CHARNAME_SHIFT
+        );
     UpdateOBJPos(
         &OAM_objs[state->player.oamIdx],
         state->player.x,
@@ -528,7 +547,12 @@ gameState_GameScreen(GameScreenState *state)
                 tmp /= 10;
                 // the tile idx for the numbers starts at 128
                 // tile idx goes up by 8 for each number
-                BF_SET(&OAM_objs[state->scoreCounterOAMIdxs[i]].attr2, 128 + digit * 8, ATTR2_CHARNAME_LEN, ATTR2_CHARNAME_SHIFT);
+                BF_SET(
+                    &OAM_objs[state->scoreCounterOAMIdxs[i]].attr2,
+                    SPRITE_Numbers_0_CHARNAME + digit * 8, // TODO: magic number bad
+                    ATTR2_CHARNAME_LEN,
+                    ATTR2_CHARNAME_SHIFT
+                );
             }
 
 #ifdef __DEBUG__
