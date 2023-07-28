@@ -16,6 +16,9 @@ typedef  int16_t i16;
 typedef uint32_t u32;
 typedef  int32_t i32;
 
+#define FALSE 0
+#define TRUE 1
+
 #define RGB(r,g,b) (uint16_t)((r << 0) + (g << 5) + (b << 10))
 
 #define SCREEN_WIDTH 240
