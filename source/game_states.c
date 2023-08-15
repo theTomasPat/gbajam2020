@@ -6,23 +6,6 @@
 #include "fixed.h"
 
 #include "256Palette.h"
-#include "Robo.h"
-#include "Obstacle_End.h"
-#include "Obstacle_Tile_01.h"
-#include "Obstacle_Tile_02.h"
-#include "Numbers_0.h"
-#include "Numbers_1.h"
-#include "Numbers_2.h"
-#include "Numbers_3.h"
-#include "Numbers_4.h"
-#include "Numbers_5.h"
-#include "Numbers_6.h"
-#include "Numbers_7.h"
-#include "Numbers_8.h"
-#include "Numbers_9.h"
-#include "ButtonA_dark.h"
-#include "ButtonA_light.h"
-
 #include "sprites.h"
 
 i32
@@ -305,10 +288,10 @@ gameState_GameInit(GameScreenState *state)
 	memcpy(&tile8_mem[4][0], SpriteTiles, SPRITETILES_LEN);
 
     // initialize OAM items
-	OBJ_ATTR *OAM_objs;
-	OAM_objs = (OBJ_ATTR *)OAM_MEM;
+	OBJ_ATTR *OAM_objs = (OBJ_ATTR *)OAM_MEM;
 	OAM_Init();
 
+    // TODO: make it easier to get OAM indices instead of hardcoding them
     // setup the score counter sprites
     state->scoreCounterOAMIdxs[0] = 0;
     state->scoreCounterOAMIdxs[1] = 1;
